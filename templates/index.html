@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>KBot - Trading Bot</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; font-weight: 400; margin: 20px; background-color: #121212; color: #e0e0e0; font-size: 14px; }
+        .container { max-width: 1200px; margin: auto; background: #212529; padding: 25px; border-radius: 8px; border: 1px solid #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .logo { height: 32px; width: auto; }
+        h1 { font-size: 24px; color: #ffffff; margin: 0; text-align: center; flex-grow: 1; font-weight: 600; }
+        h2 { font-size: 15px; color: #f5f5f5; border-bottom: 2px solid #444; padding-bottom: 8px; margin-top: 25px; font-weight: 500; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #444; padding-bottom: 8px; }
+        .section-header h2 { border-bottom: none; margin: 0; padding: 0; }
+        .status-text { font-weight: 700; }
+        .status-text.positive { color: #28a745; }
+        .status-text.negative { color: #dc3545; }
+        .info-section, .form-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
+        .info-section h2:not(.section-header h2), .form-section h2 { margin-top: 0; margin-bottom: 10px; }
+
+        /* --- Donate Section --- */
+        .donate-section { text-align: right; font-size: 12px; }
+        .donate-section strong { color: #ffffff; font-weight: 600; display: block; margin-bottom: 5px; }
+        .donate-address { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 4px; }
+        .donate-address span { color: #a0a0a0; font-family: "SF Mono", monospace; font-size: 11px; }
+        .copy-icon { cursor: pointer; color: #007bff; }
+        .copy-icon:hover { color: #0056b3; }
+
+
+        /* --- Card Styles --- */
+        .account-info, .dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .metric-card { background: #363636; padding: 15px; border-radius: 5px; border: 1px solid #444; display: flex; align-items: center; gap: 15px; position: relative; }
+        .metric-icon { font-size: 1.7em; color: #8a939e; flex-shrink: 0; width: 35px; text-align: center; }
+        .metric-text { flex-grow: 1; text-align: center; }
+        .metric-text strong { display: block; font-size: 0.75em; margin-bottom: 3px; text-transform: uppercase; color: #a0a0a0; font-weight: 500; }
+        .metric-text span { font-size: 1.3em; font-weight: 700; color: #f5f5f5; }
+        .metric-text span.positive { color: #28a745; }
+        .metric-text span.negative { color: #dc3545; }
+        .toggle-indicator { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #8a939e; transition: transform 0.3s ease; }
+        .toggle-indicator.open { transform: translateY(-50%) rotate(180deg); }
+
+        /* --- Log Styles --- */
+        .logs-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
+        .logs-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;}
+        .logs-header h2 { margin: 0; padding: 0; font-size: 1rem; border-bottom: none}
+        .log-filters { display: flex; gap: 10px; margin: 0; padding: 0; margin-left: auto; align-items: center; }
+        .logs { background: #1e1e2f; color: #c8c8c8; border: 1px solid #333; height: 250px; overflow-y: auto; padding: 8px; font-family: "SF Mono", monospace; font-size: 0.85em; border-radius: 5px; text-align: left; width: 100%; box-sizing: border-box; }
+        .log-entry { display: block; padding: 0; margin: 0; line-height: 1; word-break: break-word; text-align: left; }
+        .log-entry.INFO { color: #c8c8c8; }
+        .log-entry.WARNING { color: #ffab40; background-color: rgba(255, 171, 64, 0.06); }
+        .log-entry.ERROR { color: #ff5252; background-color: rgba(255, 82, 82, 0.06); }
+        .log-entry.EXECUTION { color: #409cff; }
+        .logs::-webkit-scrollbar { width: 8px; }
+        .logs::-webkit-scrollbar-track { background: #2a2a3f; border-radius: 5px; }
+        .logs::-webkit-scrollbar-thumb { background-color: #555; border-radius: 5px; border: 2px solid #2a2a3f; }
+
+
+        /* --- Form & Table Styles --- */
+        .form-section form { display: flex; flex-direction: column; gap: 15px; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
+        button { padding: 8px 16px; border: none; color: white; border-radius: 5px; cursor: pointer; font-size: 1em; font-family: 'Montserrat', sans-serif; font-weight: 500;}
+        .delete-btn { background-color: transparent; color: #FF6D00; padding: 4px 8px; font-size: 1.1em; }
+        .edit-btn { background-color: transparent; color: #17a2b8; padding: 4px 8px; font-size: 1.1em; margin-right: 5px; border: none; cursor: pointer; }
+        .start-btn { background-color: #28a745; }
+        .stop-btn { background-color: #dc3545; }
+        .refresh-btn { background-color: #6c757d; }
+        .add-btn { background-color: #007bff; }
+        input, select { padding: 8px; border: 1px solid #555; border-radius: 5px; font-size: 1em; background-color: #333; color: #e0e0e0; font-family: 'Montserrat', sans-serif; }
+        .form-section label { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; font-weight: 500; color: #c0c0c0; }
+        .form-section .value-input { width: 90px; }
+
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table .start-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #28a745; }
+        table .stop-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #dc3545; }
+        table .start-btn:hover { color: #3dd561; }
+        table .stop-btn:hover { color: #ff6b81; }
+
+        th, td { padding: 8px 12px; border: 1px solid #444; text-align: left; vertical-align: middle; font-size: 13px;}
+        th { background-color: #343a40; font-weight: 600; }
+        tr:nth-child(even) { background-color: #2c2f33; }
+        .status-icon { font-size: 0.8em; margin-right: 8px; }
+        .status-icon.open { color: #28a745; }
+        .status-icon.idle { color: #ffc107; }
+        .clickable-card {cursor: pointer; transition: background-color 0.2s ease-in-out;}
+        .clickable-card:hover {background-color: #495057;}
+        .positive-pnl { color: #28a745; }
+        .negative-pnl { color: #dc3545; }
+        .action-column { width: 1%; white-space: nowrap; }
+        .action-buttons-container { display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; }
+        .asset-cell-container { display: flex; align-items: center; }
+        .header-actions { display: flex; gap: 10px; }
+
+        /* --- Backtest Result Styles --- */
+        .backtest-result { margin-top: 20px; padding: 12px; background-color: #2a2a2e; border: 1px solid #444; border-radius: 5px; color: #e0e0e0; font-size: 0.9em; }
+        .backtest-result .result-header { display: flex; align-items: center; gap: 8px; font-size: 1em; font-weight: 600; color: #ffffff; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #444; }
+        .backtest-result .result-body p { margin: 4px 0; font-size: 0.9em; }
+        .backtest-result .result-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; border-bottom: 1px solid #444; padding-bottom: 12px; margin-bottom: 12px; }
+        .backtest-result .metric .label { display: block; font-size: 0.75em; text-transform: uppercase; color: #a0a0a0; margin-bottom: 3px; }
+        .backtest-result .metric .value { font-size: 1.2em; font-weight: 700; }
+        .backtest-result .metric .value.positive { color: #28a745; }
+        .backtest-result .metric .value.negative { color: #dc3545; }
+
+        .directional-results-table table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: center; }
+        .directional-results-table th, .directional-results-table td { padding: 6px; border: 1px solid #444; }
+        .directional-results-table th { background-color: #363636; font-size: 0.8em; text-transform: uppercase; color: #c0c0c0; }
+        .directional-results-table td { font-size: 0.95em; font-weight: 600; }
+        .directional-results-table .value.positive { color: #28a745; font-weight: 700; }
+        .directional-results-table .value.negative { color: #dc3545; font-weight: 700; }
+        .directional-results-table .fas { margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{ url_for('static', filename='logoKBot.png') }}" alt="Logo" class="logo">
+            <h1>Painel de Controle</h1>
+            <div class="donate-section">
+                <strong><i class="fas fa-heart" style="color: #dc3545;"></i> Donate</strong>
+                <div class="donate-address">
+                    <span>Sol: 4Lu4...FX9</span>
+                    <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('4Lu4D1yD78pLVvLf8gGgH7fS7t6kmjTaWaigy72HyFX9')"></i>
+                </div>
+                <div class="donate-address">
+                    <span>EVM: 0x80...9E11</span>
+                    <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('0x8084e7ba605ea5A802c12eF416bd571769769E11')"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <div class="section-header">
+                <h2>Contas Gerenciadas</h2>
+                <div class="header-actions">
+                    <form action="/start_all" method="post" style="margin:0;"><button type="submit" class="start-btn" title="Iniciar Todos os Bots"><i class="fas fa-play"></i> Iniciar Todos</button></form>
+                    <form action="/stop_all" method="post" style="margin:0;"><button type="submit" class="stop-btn" title="Parar Todos os Bots"><i class="fas fa-stop"></i> Parar Todos</button></form>
+                    <form action="/refresh_all" method="post" style="margin:0;"><button type="submit" class="refresh-btn" title="Atualizar Dados"><i class="fas fa-sync-alt"></i> Atualizar</button></form>
+                    <button class="add-btn" onclick="toggleAddAccountForm()" title="Adicionar Nova Conta"><i class="fa-solid fa-square-plus"></i> Nova Conta</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome da Conta</th><th>Exchange</th><th>Chave Pública</th><th>Intervalo</th><th>Status</th><th class="action-column">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for account in accounts %}
+                        <tr>
+                            <td>{{ account.account_name }}</td>
+                            <td>{{ account.exchange_name | capitalize }}</td>
+                            <td>{{ account.main_public_key[:6] }}...{{ account.main_public_key[-4:] }}</td>
+                            <td>{{ account.check_interval_seconds }}s</td>
+                            <td><span class="status-text {{ 'positive' if account.account_name in running_bots else 'negative' }}">{{ 'Executando' if account.account_name in running_bots else 'Parado' }}</span></td>
+                            <td class="action-column">
+                                <div class="action-buttons-container">
+                                    {% if account.account_name in running_bots %}
+                                        <form action="/stop/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="stop-btn" title="Parar Bot"><i class="fa-solid fa-stop"></i></button></form>
+                                    {% else %}
+                                        <form action="/start/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="start-btn" title="Iniciar Bot"><i class="fa-solid fa-play"></i></button></form>
+                                    {% endif %}
+                                    <button type="button" class="edit-btn" title="Editar Conta" onclick='editAccount({{ account | tojson | safe }})'><i class="fas fa-pencil-alt"></i></button>
+                                    <form action="/delete_account/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;" onsubmit="return confirm('Remover esta conta e todos os setups?');"><button type="submit" class="delete-btn" title="Remover Conta"><i class="fas fa-trash-alt"></i></button></form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-section" id="add-account-section" style="display: none;">
+            <h2 id="account-form-title">Adicionar Nova Conta</h2>
+            <form id="account-form" action="/manage_account" method="post" onsubmit="return validateAccountForm()">
+                <input type="hidden" name="original_account_name" id="original_account_name">
+                <div class="form-row">
+                    <label title="Um nome único para identificar esta conta no painel.">Nome da Conta<input type="text" name="account_name" required></label>
+                    <label title="A corretora onde esta conta será usada.">Exchange
+                        <select name="exchange_name" required onchange="validateAccountForm()">
+                            {% for ex_name in exchanges_allowed %}
+                            <option value="{{ ex_name }}">{{ ex_name | capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label title="O intervalo em segundos que o bot aguardará entre cada verificação de sinais de trading.">Intervalo (s)<input type="number" name="check_interval" value="180" class="value-input" required></label>
+                </div>
+                <div class="form-row"><label title="A chave de API pública da sua conta na exchange." style="flex-grow: 1;">Chave Pública<input type="text" name="main_public_key" required></label></div>
+                <div class="form-row"><label title="A chave de API privada (secret key) da sua conta na exchange." style="flex-grow: 1;">Chave Privada do Agente<input type="password" name="agent_private_key" required></label></div>
+                <div class="form-row">
+                    <button type="submit" class="add-btn">Salvar Conta</button>
+                    <button type="button" class="stop-btn" onclick="toggleAddAccountForm()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+
+        {% if displayed_account %}
+            <div class="info-section">
+                <h2>Conta: {{ displayed_account.account_name }}</h2>
+                <div class="account-info">
+                    {% if account_info %}
+                        <div class="metric-card"><i class="fas fa-wallet metric-icon"></i><div class="metric-text"><strong>SALDO</strong><span>${{ "%.2f"|format(account_info.balance|float) }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-chart-line metric-icon"></i><div class="metric-text"><strong>PATRIMÔNIO</strong><span>${{ "%.2f"|format(account_info.account_equity|float) }}</span></div></div>
+                        <div class="metric-card clickable-card" onclick="togglePositionsTable()">
+                            <i class="fas fa-box-open metric-icon"></i>
+                            <div class="metric-text"><strong>POSIÇÕES</strong><span>{{ open_positions_details | length }}</span></div>
+                            <i class="fas fa-chevron-down toggle-indicator" id="positions-toggle-icon"></i>
+                        </div>
+                        <div class="metric-card"><i class="fas fa-hand-holding-usd metric-icon"></i><div class="metric-text"><strong>DISPONÍVEL</strong><span>${{ "%.2f"|format(account_info.available_to_spend|float) }}</span></div></div>
+                    {% else %}
+                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Clique em "Atualizar Dados" para carregar.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="info-section" id="positions-section" style="display: none;">
+                <h2>Posições Abertas</h2>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Conta</th><th>Ativo</th><th>Lado</th><th>Quantidade</th><th>Preço Entrada</th><th>Preço Atual</th><th>% PnL (1x)</th><th>SL / TP</th><th>Data Criação (UTC)</th></tr></thead>
+                        <tbody>
+                            {% for pos in open_positions_details %}
+                            <tr>
+                                <td>{{ pos.account_name }}</td><td>{{ pos.symbol }}</td>
+                                <td><span class="{{ 'positive-pnl' if pos.side == 'bid' else 'negative-pnl' }}">{{ 'Long' if pos.side == 'bid' else 'Short' }}</span></td>
+                                <td>{{ pos.amount | float }}</td><td>${{ pos.entry_price|float }}</td><td>${{ pos.current_price|float }}</td>
+                                <td class="{{ 'positive-pnl' if pos.pnl_percentage >= 0 else 'negative-pnl' }}">{{ "%+.2f"|format(pos.pnl_percentage) }}%</td>
+                                <td>${{ pos.sl_price|float if pos.sl_price != 'N/A' else '-' }} / ${{ pos.tp_price|float if pos.tp_price != 'N/A' else '-' }}</td>
+                                <td>{{ pos.creation_date_utc }}</td>
+                            </tr>
+                            {% else %}<tr><td colspan="9" style="text-align: center;">Nenhuma posição aberta.</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2>Performance (Últimos 30 Dias)</h2>
+                <div class="dashboard-metrics">
+                    {% if dashboard and dashboard.total_trades > 0 %}
+                        <div class="metric-card"><i class="fas fa-dollar-sign metric-icon"></i><div class="metric-text"><strong>PnL Total</strong><span class="{{ 'positive' if dashboard.total_pnl >= 0 else 'negative' }}">${{ "%.2f"|format(dashboard.total_pnl) }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-exchange-alt metric-icon"></i><div class="metric-text"><strong>Trades</strong><span>{{ dashboard.total_trades }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-bullseye metric-icon"></i><div class="metric-text"><strong>Acerto</strong><span>{{ "%.1f"|format(dashboard.win_rate) }}%</span></div></div>
+                        <div class="metric-card"><i class="fas fa-arrow-up metric-icon" style="color: #28a745;"></i><div class="metric-text"><strong>Ganho Médio</strong><span class="positive">${{ "%.2f"|format(dashboard.avg_win) }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-arrow-down metric-icon" style="color: #dc3545;"></i><div class="metric-text"><strong>Perda Média</strong><span class="negative">${{ "%.2f"|format(dashboard.avg_loss) }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-receipt metric-icon"></i><div class="metric-text"><strong>Taxas</strong><span>${{ "%.2f"|format(dashboard.total_fees) }}</span></div></div>
+                    {% else %}
+                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Nenhum histórico de trades encontrado.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2>Setups Ativos</h2>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Conta</th><th>Ativo</th><th>Estratégia</th><th>Alav.</th><th>Risco/Trade</th><th>Stop Loss</th><th>Take Profit</th><th>Modo Saída</th><th>Direção</th><th>Trailing Stop</th><th class="action-column">Ação</th></tr></thead>
+                        <tbody>
+                            {% for market in setups_to_display %}
+                            <tr>
+                                <td>{{ market.account_name }}</td>
+                                <td>
+                                    <div class="asset-cell-container"><i class="fas fa-circle status-icon {{ 'open' if market.base_currency in open_position_symbols else 'idle' }}"></i><span>{{ market.base_currency }}</span></div>
+                                </td>
+                                <td>{{ market.strategy_name }}</td><td>{{ market.leverage }}x</td>
+                                <td>{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>
+                                <td>{{ "%.2f"|format(market.stop_loss_config.value * 100) ~ '%' if market.stop_loss_config.type == 'percentage' else market.stop_loss_config.value ~ 'x ATR' }}</td>
+                                <td>{{ market.take_profit_rrr }}:1 RRR</td><td>{{ market.exit_mode | capitalize }}</td>
+                                <td>{{ 'Long & Short' if market.direction_mode == 'long_short' else 'Long Only' if market.direction_mode == 'long_only' else 'Short Only' }}</td>
+                                <td>
+                                    {% set tsl = market.trailing_stop_config %}{{ tsl.type|capitalize if tsl and tsl.type != 'none' else 'Nenhum' }}{% if tsl and tsl.type == 'breakeven' %} ({{ tsl.breakeven_trigger_rrr }} RRR){% elif tsl and tsl.type == 'atr' %} ({{ tsl.atr_multiple }}x){% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons-container">
+                                        <button type="button" class="edit-btn" title="Editar Setup" onclick='editSetup({{ market | tojson | safe }})'><i class="fas fa-pencil-alt"></i></button>
+                                        <form action="/delete_market/{{ market.account_name }}/{{ market.id }}" method="post" style="margin:0;" onsubmit="return confirm('Remover este setup?');"><button type="submit" class="delete-btn" title="Remover Setup"><i class="fas fa-trash-alt"></i></button></form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Adicionar/Atualizar Setup</h2>
+                <form id="setup-form" action="/process_setup_form" method="post">
+                    <div class="form-row">
+                        <label title="Selecione a conta de negociação para associar este setup.">Conta<select name="account_name" style="width: 220px;">{% for acc in accounts %}<option value="{{ acc.account_name }}">{{ acc.account_name }}</option>{% endfor %}</select></label>
+                        <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL).">Ativo<input type="text" name="base_currency" required style="width: 100px;"></label>
+                        <label title="Percentual do capital total da conta a ser arriscado em cada trade.">Risco (%)<input type="number" name="risk" value="1.0" step="0.1" required class="value-input"></label>
+                        <label title="Fator de multiplicação da sua posição (ex: 10x, 20x).">Alavancagem<input type="number" name="leverage" value="10" step="1" required class="value-input"></label>
+                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas.">Direção<select name="direction_mode" style="width: 150px;"><option value="long_short">Long & Short</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option></select></label>
+                    </div>
+                    <div class="form-row">
+                        <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações.">Estratégia<select name="strategy_name" style="width: 280px;">{% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}</select></label>
+                        <label title="O valor para o Stop Loss. Se o tipo for 'percentage', é a porcentagem do preço de entrada. Se for 'ATR', é o multiplicador do ATR.">Valor SL<input type="number" name="sl_value" value="2.0" step="0.1" required class="value-input"></label>
+                        <label title="A relação Risco/Retorno para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do stop loss.">TP (RRR)<input type="number" name="rrr" value="2.0" step="0.1" required class="value-input"></label>
+                    </div>
+                    <div class="form-row">
+                         <label title="'Passivo' usa apenas SL/TP. 'Ativo' permite que a estratégia feche a posição se o sinal reverter.">Modo Saída<select name="exit_mode" style="width: 120px;" onchange="toggleTslSection(this.value)"><option value="passivo">Passivo</option><option value="ativo">Ativo</option></select></label>
+                        <div id="tsl-section" style="display:none; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+                            <label title="Um stop loss que se move a favor do preço para proteger os lucros.">Trailing Stop<select name="tsl_type" onchange="toggleTslOptions(this.value)" style="width: 180px;"><option value="none">Nenhum</option><option value="breakeven">Breakeven</option><option value="atr">ATR Trailing</option></select></label>
+                            <div id="tsl-breakeven-options" style="display:none;"><label title="(Breakeven) Relação Risco/Retorno que, ao ser atingida, move o Stop Loss para o preço de entrada.">Acionar em (RRR)<input type="number" name="tsl_breakeven_trigger" value="1.0" step="0.1" class="value-input"></label></div>
+                            <div id="tsl-atr-options" style="display:none;"><label title="(ATR Trailing) Fator que multiplica o valor do ATR para definir a distância do trailing stop.">Múltiplo ATR<input type="number" name="tsl_atr_multiple" value="2.0" step="0.1" class="value-input"></label></div>
+                            <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado."><input type="checkbox" name="remove_tp_on_trail" value="true">Remover TP</label>
+                        </div>
+                    </div>
+                     <div class="form-row" style="margin-top: 10px;">
+                        <button type="submit" name="action" value="add_market" class="add-btn">Adicionar/Atualizar</button>
+                        <button type="submit" name="action" value="run_backtest" class="refresh-btn">Rodar Backtest</button>
+                    </div>
+                </form>
+
+                {% if backtest_result and last_backtest_symbol and backtest_result.get(last_backtest_symbol) %}
+                {% set result = backtest_result[last_backtest_symbol] %}
+                <div class="backtest-result">
+                    <div class="result-header"><i class="fas fa-chart-bar metric-icon"></i><span>Melhor Resultado para <strong>{{ last_backtest_symbol }}</strong></span></div>
+                    <div class="result-body"><p><strong>Estratégia:</strong> {{ result['Estratégia'] }}</p><p><strong>Parâmetros:</strong> SL {{ result['Stop Loss %'] }} / TP {{ result['Take Profit RRR'] }}</p></div>
+                    <div class="result-metrics">
+                        <div class="metric"><span class="label">Trades</span><span class="value">{{ result['Total de Trades'] }}</span></div>
+                        <div class="metric"><span class="label">Retorno Total</span><span class="value {{ 'positive' if result['Retorno %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Retorno %']) }}%</span></div>
+                        <div class="metric"><span class="label">Acerto Total</span><span class="value">{{ "%.1f"|format(result['Taxa de Acerto %']) }}%</span></div>
+                    </div>
+                    <div class="directional-results-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Direção</th>
+                                    <th>Trades</th>
+                                    <th>Retorno</th>
+                                    <th>Acerto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><i class="fas fa-arrow-trend-up positive-pnl"></i> Long</td>
+                                    <td>{{ result['Long Trades'] }}</td>
+                                    <td class="value {{ 'positive' if result['Long Return %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Long Return %']) }}%</td>
+                                    <td>{{ "%.1f"|format(result['Long Win Rate %']) }}%</td>
+                                </tr>
+                                <tr>
+                                    <td><i class="fas fa-arrow-trend-down negative-pnl"></i> Short</td>
+                                    <td>{{ result['Short Trades'] }}</td>
+                                    <td class="value {{ 'positive' if result['Short Return %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Short Return %']) }}%</td>
+                                    <td>{{ "%.1f"|format(result['Short Win Rate %']) }}%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="info-section" style="text-align: center;"><h2>Nenhuma conta configurada</h2><p>Adicione uma conta para começar.</p></div>
+        {% endif %}
+
+        <div class="logs-section">
+            <div class="logs-header">
+                <h2>Logs</h2>
+                <form id="log-filter-form" action="{{ url_for('index') }}" method="get" class="log-filters">
+                    <select name="log_level" onchange="this.form.submit()">
+                        <option value="all" {% if selected_level == 'all' %}selected{% endif %}>Todos os Níveis</option>
+                        {% for level in log_levels %}<option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+                    </select>
+                    <select name="log_account" onchange="this.form.submit()">
+                        <option value="all" {% if selected_account == 'all' %}selected{% endif %}>Todas as Contas</option>
+                        {% for acc in log_accounts %}<option value="{{ acc }}" {% if selected_account == acc %}selected{% endif %}>{{ acc }}</option>{% endfor %}
+                    </select>
+                </form>
+            </div>
+            <div class="logs" id="log-container">
+                {%- for log in logs|reverse -%}
+                    <div class="log-entry {{ log.level }}">
+                        [{{ log.timestamp }}] [{{ log.account }}] [{{ log.level }}] {% autoescape false %}{{ log.message }}{% endautoescape %}
+                    </div>
+                {%- endfor -%}
+            </div>
+        </div>
+    </div>
+    <script>
+        const exchangesData = {{ exchanges_data | tojson | safe }};
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Endereço copiado!");
+            }, (err) => {
+                alert("Falha ao copiar: ", err);
+            });
+        }
+
+        function validateAccountForm() {
+            const form = document.getElementById('account-form');
+            const exchangeName = form.querySelector('[name="exchange_name"]').value;
+            const originalAccountName = form.querySelector('[name="original_account_name"]').value;
+
+            const exchange = exchangesData[exchangeName];
+            if (exchange && !exchange.multi_account_allowed && exchange.accounts && exchange.accounts.length > 0) {
+                if (!originalAccountName || (exchange.accounts[0] && exchange.accounts[0].account_name !== originalAccountName)) {
+                    alert(`A exchange '${exchangeName}' não permite múltiplas contas. Você só pode editar a conta existente.`);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function toggleTslSection(exitMode) {
+            const tslSection = document.getElementById('tsl-section');
+            if (exitMode === 'ativo') {
+                tslSection.style.display = 'flex';
+            } else {
+                tslSection.style.display = 'none';
+                document.querySelector('select[name="tsl_type"]').value = 'none';
+                toggleTslOptions('none');
+            }
+        }
+
+        function toggleTslOptions(tslType) {
+            document.getElementById('tsl-breakeven-options').style.display = tslType === 'breakeven' ? 'flex' : 'none';
+            document.getElementById('tsl-atr-options').style.display = tslType === 'atr' ? 'flex' : 'none';
+        }
+
+        function editSetup(setupData) {
+            const form = document.getElementById('setup-form');
+            form.querySelector('[name="account_name"]').value = setupData.account_name;
+            form.querySelector('[name="base_currency"]').value = setupData.base_currency;
+            form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
+            form.querySelector('[name="leverage"]').value = setupData.leverage;
+            form.querySelector('[name="direction_mode"]').value = setupData.direction_mode;
+            form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
+            form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
+            const slValueInput = form.querySelector('[name="sl_value"]');
+            slValueInput.value = (setupData.stop_loss_config.type === 'percentage')
+                ? setupData.stop_loss_config.value * 100
+                : setupData.stop_loss_config.value;
+
+            const exitModeSelect = form.querySelector('[name="exit_mode"]');
+            exitModeSelect.value = setupData.exit_mode;
+            exitModeSelect.dispatchEvent(new Event('change'));
+
+            setTimeout(() => {
+                const tslConfig = setupData.trailing_stop_config;
+                const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+                if (tslConfig && tslConfig.type !== 'none') {
+                    tslTypeSelect.value = tslConfig.type;
+                    if (tslConfig.type === 'breakeven') {
+                        form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
+                    } else if (tslConfig.type === 'atr') {
+                        form.querySelector('[name="tsl_atr_multiple"]').value = tslConfig.atr_multiple;
+                    }
+                    form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
+                } else {
+                    tslTypeSelect.value = 'none';
+                }
+                tslTypeSelect.dispatchEvent(new Event('change'));
+            }, 50);
+
+            form.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function togglePositionsTable() {
+            const section = document.getElementById('positions-section');
+            const icon = document.getElementById('positions-toggle-icon');
+            const isOpen = section.style.display === 'block';
+
+            if (isOpen) {
+                section.style.display = 'none';
+                icon.classList.remove('open');
+            } else {
+                section.style.display = 'block';
+                icon.classList.add('open');
+            }
+        }
+
+        function toggleAddAccountForm(is_editing = false) {
+            const section = document.getElementById('add-account-section');
+            if (section.style.display === 'none' || is_editing) {
+                section.style.display = 'block';
+                section.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                section.style.display = 'none';
+                resetAccountForm();
+            }
+        }
+
+        function resetAccountForm() {
+            const form = document.getElementById('account-form');
+            form.reset();
+            document.getElementById('account-form-title').innerText = 'Adicionar Nova Conta';
+            document.getElementById('original_account_name').value = '';
+        }
+
+        function editAccount(accountData) {
+            const form = document.getElementById('account-form');
+            document.getElementById('account-form-title').innerText = 'Editar Conta: ' + accountData.account_name;
+            form.querySelector('[name="original_account_name"]').value = accountData.account_name;
+            form.querySelector('[name="account_name"]').value = accountData.account_name;
+            form.querySelector('[name="exchange_name"]').value = accountData.exchange_name;
+            form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
+            form.querySelector('[name="agent_private_key"]').value = ''; // Clear private key for security
+            form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
+            toggleAddAccountForm(true);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const exitSelect = document.querySelector('select[name="exit_mode"]');
+            if(exitSelect) {
+                toggleTslSection(exitSelect.value);
+            }
+        });
+    </script>
+</body>
+</html>

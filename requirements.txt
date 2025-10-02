@@ -1,0 +1,6 @@
+Flask
+pandas
+requests
+ccxt
+solders
+base58-solana
