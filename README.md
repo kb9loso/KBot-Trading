@@ -19,7 +19,7 @@ Esta etapa é necessária tanto para o método simplificado como para o manual.
 
 1.  Na pasta do projeto, encontre o ficheiro `config.example.json`.
 2.  Faça uma cópia deste ficheiro e renomeie-a para `config.json`.
-3.  Abra o `config.json` com um editor de texto e preencha os campos `main_public_key` e `agent_private_key` com as suas chaves de API.
+3.  Não é necessário alterá-lo manualmente, já que todas as configurações estão disponíveis via interface.
 
 ---
 
