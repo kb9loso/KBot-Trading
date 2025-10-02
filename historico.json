@@ -427,5 +427,83 @@
         "take_profit": "1087.34",
         "risco_percentual": "1.0%",
         "rrr": "2.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T15:00:44.170946+00:00",
+        "order_id": 334437906,
+        "ativo": "SOL",
+        "lado": "SELL",
+        "quantidade": "0.18",
+        "estrategia": "4. Breakout Curto (15m)",
+        "preco_entrada_aprox": "223.17",
+        "stop_loss": "228.75",
+        "take_profit": "206.43",
+        "risco_percentual": "1.0%",
+        "rrr": "3.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T15:46:06.450218+00:00",
+        "order_id": 334857957,
+        "ativo": "XPL",
+        "lado": "SELL",
+        "quantidade": "26",
+        "estrategia": "8. Scalper Volume (1m)",
+        "preco_entrada_aprox": "0.9364",
+        "stop_loss": "0.9739",
+        "take_profit": "0.8615",
+        "risco_percentual": "1.0%",
+        "rrr": "2.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T16:01:06.991463+00:00",
+        "order_id": 334977583,
+        "ativo": "XPL",
+        "lado": "SELL",
+        "quantidade": "26",
+        "estrategia": "8. Scalper Volume (1m)",
+        "preco_entrada_aprox": "0.9424",
+        "stop_loss": "0.9801",
+        "take_profit": "0.867",
+        "risco_percentual": "1.0%",
+        "rrr": "2.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T16:15:36.287901+00:00",
+        "order_id": 335138471,
+        "ativo": "SOL",
+        "lado": "BUY",
+        "quantidade": "0.17",
+        "estrategia": "4. Breakout Curto (15m)",
+        "preco_entrada_aprox": "228.49",
+        "stop_loss": "222.78",
+        "take_profit": "245.63",
+        "risco_percentual": "1.0%",
+        "rrr": "3.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T16:25:04.311917+00:00",
+        "order_id": 335222460,
+        "ativo": "XPL",
+        "lado": "BUY",
+        "quantidade": "25",
+        "estrategia": "8. Scalper Volume (1m)",
+        "preco_entrada_aprox": "0.9469",
+        "stop_loss": "0.909",
+        "take_profit": "1.0227",
+        "risco_percentual": "1.0%",
+        "rrr": "2.0:1"
+    },
+    {
+        "timestamp_utc": "2025-10-02T17:01:03.844697+00:00",
+        "order_id": 335508872,
+        "ativo": "LINK",
+        "lado": "BUY",
+        "quantidade": "1.7",
+        "estrategia": "1. Tendencia Rapida (15m)",
+        "preco_entrada_aprox": "22.522",
+        "stop_loss": "21.959",
+        "take_profit": "23.648",
+        "risco_percentual": "1.0%",
+        "rrr": "2.0:1"
     }
 ]
