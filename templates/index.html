@@ -13,6 +13,25 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .logo { height: 32px; width: auto; }
         h1 { font-size: 24px; color: #ffffff; margin: 0; text-align: center; flex-grow: 1; font-weight: 600; }
+        .header-right-side {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .version-info {
+            font-size: 11px;
+            text-align: right;
+            color: #a0a0a0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+        .version-text { font-family: "SF Mono", monospace; }
+        .update-link { text-decoration: none; }
+        .status-text.warning { color: #ffab40; }
+        .status-text .fas { margin-right: 4px; }
         h2 { font-size: 15px; color: #f5f5f5; border-bottom: 2px solid #444; padding-bottom: 8px; margin-top: 25px; font-weight: 500; }
         .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #444; padding-bottom: 8px; }
         .section-header h2 { border-bottom: none; margin: 0; padding: 0; }
@@ -23,7 +42,7 @@
         .info-section h2:not(.section-header h2), .form-section h2 { margin-top: 0; margin-bottom: 10px; }
 
         /* --- Donate Section --- */
-        .donate-section { text-align: right; font-size: 12px; }
+        .donate-section { text-align: center; font-size: 12px; }
         .donate-section strong { color: #ffffff; font-weight: 600; display: block; margin-bottom: 5px; }
         .donate-address { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 4px; }
         .donate-address span { color: #a0a0a0; font-family: "SF Mono", monospace; font-size: 11px; }
@@ -119,15 +138,32 @@
         <div class="header">
             <img src="{{ url_for('static', filename='logoKBot.png') }}" alt="Logo" class="logo">
             <h1>Painel de Controle</h1>
-            <div class="donate-section">
-                <strong><i class="fas fa-heart" style="color: #dc3545;"></i> Donate</strong>
-                <div class="donate-address">
-                    <span>Sol: 4Lu4...FX9</span>
-                    <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('4Lu4D1yD78pLVvLf8gGgH7fS7t6kmjTaWaigy72HyFX9')"></i>
+            <div class="header-right-side">
+                <div class="donate-section">
+                    <strong><i class="fas fa-heart" style="color: #dc3545;"></i> Donate</strong>
+                    <div class="donate-address">
+                        <span>Sol: 4Lu4...FX9</span>
+                        <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('4Lu4D1yD78pLVvLf8gGgH7fS7t6kmjTaWaigy72HyFX9')"></i>
+                    </div>
+                    <div class="donate-address">
+                        <span>EVM: 0x80...9E11</span>
+                        <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('0x8084e7ba605ea5A802c12eF416bd571769769E11')"></i>
+                    </div>
                 </div>
-                <div class="donate-address">
-                    <span>EVM: 0x80...9E11</span>
-                    <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('0x8084e7ba605ea5A802c12eF416bd571769769E11')"></i>
+
+                <div class="version-info">
+                    {% if version_info and not version_info.error %}
+                        <span class="version-text">Versão: {{ version_info.local_short }}</span>
+                        {% if version_info.is_latest %}
+                            <span class="status-text positive"><i class="fas fa-check-circle"></i> Atualizado</span>
+                        {% else %}
+                            <a href="{{ version_info.repo_url }}" target="_blank" class="update-link">
+                                <span class="status-text warning"><i class="fas fa-arrow-alt-circle-up"></i> Nova versão disponível</span>
+                            </a>
+                        {% endif %}
+                    {% elif version_info.error %}
+                         <span class="status-text warning" title="{{ version_info.error }}"><i class="fas fa-exclamation-triangle"></i> Verificação de Versão Indisponível</span>
+                    {% endif %}
                 </div>
             </div>
         </div>

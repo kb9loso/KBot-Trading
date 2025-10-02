@@ -1,4 +1,7 @@
 # app.py
+import subprocess
+
+import requests
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 import json
 import threading
@@ -24,6 +27,31 @@ last_refresh_error = {}
 backtest_result_cache = {}
 running_bots = {}
 
+
+def get_version_info():
+    """Busca a versão local (commit hash) e compara com a remota no GitHub."""
+    try:
+        # Garante que a pasta .git existe para não dar erro
+        git_dir = subprocess.run(['git', 'rev-parse', '--git-dir'], capture_output=True, text=True, check=True)
+        if ".git" not in git_dir.stdout:
+            raise FileNotFoundError("Diretório .git não encontrado.")
+
+        local_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
+        repo_url = "https://api.github.com/repos/kb9loso/KBot-Trading/commits/main"
+
+        response = requests.get(repo_url, timeout=5)
+        response.raise_for_status()
+        remote_hash = response.json()['sha']
+
+        return {
+            "local_short": local_hash[:7],
+            "is_latest": local_hash == remote_hash,
+            "repo_url": "https://github.com/kb9loso/KBot-Trading"
+        }
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {"error": "Não é um repositório Git."}
+    except Exception as e:
+        return {"error": f"Falha ao verificar versão: {e}"}
 
 def load_config():
     with open('config.json', 'r') as f:
@@ -170,6 +198,7 @@ def index():
     exchanges_allowed = config.get('exchanges_allowed', [])
     strategy_names = list(STRATEGIES.keys())
     last_backtest_symbol = request.args.get('last_backtest_symbol')
+    version_info = get_version_info()
 
     all_accounts = []
     for ex_name, ex_data in exchanges.items():
@@ -232,7 +261,8 @@ def index():
         log_levels=log_levels,
         log_accounts=log_accounts,
         selected_level=selected_level,
-        selected_account=selected_account
+        selected_account=selected_account,
+        version_info=version_info
     )
 
 
