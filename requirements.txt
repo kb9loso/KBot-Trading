@@ -3,4 +3,5 @@ pandas
 requests
 ccxt
 solders
-base58-solana
+base58
+APScheduler

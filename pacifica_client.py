@@ -138,42 +138,40 @@ class PacificaClient:
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def create_market_order(self, symbol: str, side: str, amount: str, slippage: float,
-                            take_profit_price: str, stop_loss_price: str, tick_size: float) -> Dict:
+    def create_market_order(self, symbol: str, side: str, amount: str, reduce_only: bool = False,
+                            slippage: float = 1.0, take_profit_price: str = None,
+                            stop_loss_price: str = None, tick_size: float = 0.01) -> Dict:
+        """
+        Cria uma ordem a mercado. Pode ser usada para abrir (com TP/SL) ou fechar (reduce_only=True) uma posição.
+        """
         path = '/api/v1/orders/create_market'
         timestamp = int(time.time() * 1000)
         signature_header = {"type": "create_market_order", "timestamp": timestamp, "expiry_window": 30000}
         is_buy_side = side.upper() == "BUY"
-        sl_price_float = float(stop_loss_price)
-        tp_price_float = float(take_profit_price)
-
-        if is_buy_side:
-            sl_limit_price = sl_price_float * (1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
-            tp_limit_price = tp_price_float * (1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
-        else:
-            sl_limit_price = sl_price_float * (1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
-            tp_limit_price = tp_price_float * (1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
-
-        sl_limit_price_rounded = round_to_increment(sl_limit_price, tick_size)
-        tp_limit_price_rounded = round_to_increment(tp_limit_price, tick_size)
 
         signature_payload = {
             "symbol": symbol, "amount": amount, "side": "bid" if is_buy_side else "ask",
-            "slippage_percent": str(slippage), "reduce_only": False,
-            "take_profit": {"stop_price": take_profit_price, "limit_price": tp_limit_price_rounded},
-            "stop_loss": {"stop_price": stop_loss_price, "limit_price": sl_limit_price_rounded}
+            "slippage_percent": str(slippage), "reduce_only": reduce_only,
         }
-        final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
-        return self._make_request('POST', path, data=final_payload)
 
-    def close_market_order(self, symbol: str, side: str, amount: str) -> Dict:
-        path = '/api/v1/orders/create_market'
-        timestamp = int(time.time() * 1000)
-        signature_header = {"type": "create_market_order", "timestamp": timestamp, "expiry_window": 30000}
-        signature_payload = {
-            "symbol": symbol, "amount": amount, "side": "bid" if side.upper() == "BUY" else "ask",
-            "slippage_percent": "1.0", "reduce_only": True
-        }
+        # Adiciona TP e SL apenas se ambos forem fornecidos (para ordens de abertura)
+        if take_profit_price and stop_loss_price:
+            sl_price_float = float(stop_loss_price)
+            tp_price_float = float(take_profit_price)
+
+            if is_buy_side:
+                sl_limit_price = sl_price_float * (1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                tp_limit_price = tp_price_float * (1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+            else:
+                sl_limit_price = sl_price_float * (1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                tp_limit_price = tp_price_float * (1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+
+            sl_limit_price_rounded = round_to_increment(sl_limit_price, tick_size)
+            tp_limit_price_rounded = round_to_increment(tp_limit_price, tick_size)
+
+            signature_payload["take_profit"] = {"stop_price": take_profit_price, "limit_price": tp_limit_price_rounded}
+            signature_payload["stop_loss"] = {"stop_price": stop_loss_price, "limit_price": sl_limit_price_rounded}
+
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
@@ -204,12 +202,53 @@ class PacificaClient:
         return []
 
     def get_trade_history(self, start_time_ms: int, end_time_ms: int) -> List[Dict]:
+        # This method is slightly modified to handle pagination, similar to the new order history method.
         path = '/api/v1/positions/history'
-        params = {'account': self.main_public_key, 'start_time': start_time_ms, 'end_time': end_time_ms, 'limit': 1000}
-        response_data = self._make_request('GET', path, params=params)
-        if response_data and 'data' in response_data and isinstance(response_data['data'], list):
-            return response_data['data']
-        return response_data if response_data and isinstance(response_data, list) else []
+        all_records = []
+        offset = 0
+        limit = 300  # Use a reasonable limit
+
+        while True:
+            params = {
+                'account': self.main_public_key,
+                'start_time': start_time_ms,
+                'end_time': end_time_ms,
+                'limit': limit,
+                'offset': offset
+            }
+            response_data = self._make_request('GET', path, params=params)
+
+            if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
+                records = response_data['data']
+                all_records.extend(records)
+                if len(records) < limit:
+                    break  # Exit loop if we received less than the limit, meaning it's the last page
+                offset += len(records)
+            else:
+                break
+        return all_records
+
+    def get_order_history(self) -> List[Dict]:
+        path = '/api/v1/orders/history'
+        all_orders = []
+        offset = 0
+        limit = 300
+        while True:
+            params = {
+                'account': self.main_public_key,
+                'limit': limit,
+                'offset': offset
+            }
+            response_data = self._make_request('GET', path, params=params)
+            if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
+                orders = response_data['data']
+                all_orders.extend(orders)
+                if len(orders) < limit:
+                    break
+                offset += len(orders)
+            else:
+                break
+        return all_orders
 
     def get_market_info(self, symbol: str) -> Dict:
         path = '/api/v1/info'

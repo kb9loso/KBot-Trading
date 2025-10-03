@@ -8,11 +8,15 @@ import threading
 import time
 from datetime import datetime, timedelta
 import pandas as pd
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from bot_logic import TradingBot
 from strategies import STRATEGIES
 from pacifica_client import PacificaClient
 from backtester import run_full_backtest
+from database import init_db, sync_order_history, sync_trade_history
+from notifications import check_and_send_close_alerts
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -53,6 +57,7 @@ def get_version_info():
     except Exception as e:
         return {"error": f"Falha ao verificar versão: {e}"}
 
+
 def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
@@ -61,6 +66,89 @@ def load_config():
 def save_config(config):
     with open('config.json', 'w') as f:
         json.dump(config, f, indent=4)
+
+
+# ==================================================================
+# INÍCIO - LÓGICA DO AGENDADOR (ATUALIZADA)
+# ==================================================================
+def sync_all_trade_histories(start_time_ms: int):
+    """Função auxiliar para sincronizar o histórico de trades a partir de um timestamp."""
+    print(f"AGENDADOR: Iniciando sincronização de TRADES - {datetime.now()}")
+    config = load_config()
+    pacifica_config = config.get('exchanges', {}).get('pacifica', {})
+
+    for account_config in pacifica_config.get('accounts', []):
+        try:
+            client = PacificaClient(
+                main_public_key=account_config['main_public_key'],
+                agent_private_key=account_config['agent_private_key']
+            )
+            # Passa o start_time e o account_name para a função de sincronização
+            sync_trade_history(client, 'pacifica', account_config['account_name'], start_time_ms)
+        except Exception as e:
+            print(f"ERRO na sincronização de trades para {account_config['account_name']}: {e}")
+
+
+
+def hourly_alert_task():
+    """Tarefa principal que roda de hora em hora."""
+    config = load_config()
+    if not config.get('telegram', {}).get('enabled', False):
+        # print(f"AGENDADOR HORÁRIO: Notificações do Telegram desativadas. Pulando tarefa. - {datetime.now()}")
+        return
+
+    # Calcula o start_time para as últimas 24 horas
+    start_time_ms = int((datetime.now() - timedelta(days=1)).timestamp() * 1000)
+
+    sync_all_trade_histories(start_time_ms)
+    check_and_send_close_alerts()
+
+
+def full_daily_sync_task():
+    """Tarefa diária que faz uma sincronização completa (trades e ordens)."""
+    print("\n" + "=" * 50)
+    print(f"AGENDADOR DIÁRIO: Iniciando tarefa de sincronização COMPLETA - {datetime.now()}")
+    print("=" * 50)
+    config = load_config()
+    pacifica_config = config.get('exchanges', {}).get('pacifica', {})
+
+    # Para a tarefa diária, usamos uma janela maior (ex: 90 dias) para garantir a integridade
+    daily_start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
+
+    for account_config in pacifica_config.get('accounts', []):
+        try:
+            print(f"Sincronização diária completa para a conta: {account_config['account_name']}")
+            client = PacificaClient(
+                main_public_key=account_config['main_public_key'],
+                agent_private_key=account_config['agent_private_key']
+            )
+            sync_order_history(client, 'pacifica', account_config['account_name'])
+            sync_trade_history(client, 'pacifica', account_config['account_name'], daily_start_time_ms)
+        except Exception as e:
+            print(f"ERRO durante a sincronização diária da conta {account_config['account_name']}: {e}")
+    print("=" * 50)
+    print("AGENDADOR DIÁRIO: Tarefa de sincronização completa concluída.")
+    print("=" * 50 + "\n")
+
+
+# Configura o agendador
+scheduler = BackgroundScheduler(daemon=True)
+
+# Adiciona a nova tarefa horária
+scheduler.add_job(hourly_alert_task, 'interval', hours=1, next_run_time=datetime.now() + timedelta(seconds=30))
+
+# Mantém a tarefa diária completa
+scheduler.add_job(full_daily_sync_task, 'interval', hours=24, next_run_time=datetime.now() + timedelta(minutes=5))
+
+scheduler.start()
+
+# Garante que o agendador é desligado corretamente ao fechar a aplicação
+atexit.register(lambda: scheduler.shutdown())
+
+
+# ==================================================================
+# FIM - LÓGICA DO AGENDADOR
+# ==================================================================
 
 
 @app.route('/manage_account', methods=['POST'])
@@ -137,7 +225,10 @@ def calculate_dashboard_metrics(trades: list) -> dict:
 def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
     global account_info_cache, dashboard_metrics_cache, open_positions_cache, last_refresh_error
     account_name = account_config['account_name']
-
+    leverage_map = {
+        market['base_currency'].upper(): market.get('leverage', 1)
+        for market in account_config.get('markets_to_trade', [])
+    }
     try:
         client = PacificaClient(main_public_key=account_config['main_public_key'],
                                 agent_private_key=account_config['agent_private_key'])
@@ -162,6 +253,8 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
             prices_map = {p['symbol'].upper(): float(p['mark']) for p in all_prices if 'mark' in p}
             for pos in open_positions_list:
                 symbol, entry_price = pos['symbol'].upper(), float(pos['entry_price'])
+                leverage = leverage_map.get(symbol, 1)  # Usa 1x como padrão se não encontrar
+
                 current_price = prices_map.get(symbol, 0.0)
                 sl_order = next((o for o in all_open_orders if
                                  o.get('symbol', '').upper() == symbol and o.get('order_type', '').startswith(
@@ -169,8 +262,13 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
                 tp_order = next((o for o in all_open_orders if
                                  o.get('symbol', '').upper() == symbol and o.get('order_type', '').startswith(
                                      'take_profit')), None)
-                pnl_pct = ((current_price - entry_price) / entry_price) * 100 if pos.get('side') == 'bid' else ((
-                                                                                                                        entry_price - current_price) / entry_price) * 100 if entry_price > 0 else 0
+
+                # Calcula a variação de preço percentual
+                price_change_pct = ((current_price - entry_price) / entry_price) * 100 if pos.get(
+                    'side') == 'bid' else ((entry_price - current_price) / entry_price) * 100 if entry_price > 0 else 0
+
+                # Aplica a alavancagem para obter o PnL (ROI) real
+                pnl_pct = price_change_pct * leverage
                 pos.update({
                     'account_name': account_name,
                     'current_price': current_price,
@@ -199,6 +297,7 @@ def index():
     strategy_names = list(STRATEGIES.keys())
     last_backtest_symbol = request.args.get('last_backtest_symbol')
     version_info = get_version_info()
+    telegram_config = config.get('telegram', {})
 
     all_accounts = []
     for ex_name, ex_data in exchanges.items():
@@ -262,7 +361,8 @@ def index():
         log_accounts=log_accounts,
         selected_level=selected_level,
         selected_account=selected_account,
-        version_info=version_info
+        version_info=version_info,
+        telegram_config=telegram_config
     )
 
 
@@ -300,6 +400,27 @@ def start_bot_logic(account_name, exchange_name):
             (acc for acc in config['exchanges'][exchange_name]['accounts'] if acc['account_name'] == account_name),
             None)
         if account_config:
+            try:
+                print(f"Sincronizando histórico para a conta {account_name} antes de iniciar o bot...")
+                client = PacificaClient(
+                    main_public_key=account_config['main_public_key'],
+                    agent_private_key=account_config['agent_private_key']
+                )
+                # Sincroniza o histórico de ordens
+                sync_order_history(client, exchange_name, account_name)
+
+                # Sincroniza o histórico de trades dos últimos 90 dias
+                start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
+                sync_trade_history(client, exchange_name, account_name, start_time_ms)
+                print(f"Sincronização para {account_name} concluída.")
+            except Exception as e:
+                error_msg = f"ERRO ao sincronizar o histórico para a conta {account_name} ao iniciar: {e}"
+                print(error_msg)
+                bot_logs.append(
+                    {"timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "account": "Sistema", "level": "ERROR",
+                     "message": error_msg})
+            # --- FIM DA ALTERAÇÃO ---
+
             bot_instance_local = TradingBot(account_config, config, bot_logs, exchange_name)
             bot_thread_local = threading.Thread(target=bot_instance_local.run, daemon=True)
             bot_thread_local.start()
@@ -340,6 +461,48 @@ def delete_market(account_name, market_id):
                                                m.get('id') != market_id]
                 save_config(config)
                 return redirect(url_for('index'))
+    return redirect(url_for('index'))
+
+
+@app.route('/save_telegram_settings', methods=['POST'])
+def save_telegram_settings():
+    config = load_config()
+    token = request.form.get('telegram_bot_token')
+    chat_id = request.form.get('telegram_chat_id')
+
+    if 'telegram' not in config:
+        config['telegram'] = {}
+
+    config['telegram']['bot_token'] = token
+    config['telegram']['chat_id'] = chat_id
+    config['telegram']['enabled'] = bool(token and chat_id)
+
+    save_config(config)
+    flash("Configurações do Telegram salvas com sucesso!", "success")
+    return redirect(url_for('index'))
+
+
+@app.route('/toggle_notifications/<exchange_name>/<account_name>', methods=['POST'])
+def toggle_notifications(exchange_name, account_name):
+    config = load_config()
+
+    telegram_config = config.get('telegram', {})
+    if not telegram_config.get('enabled'):
+        flash("Preencha as configurações de notificação do Telegram primeiro.", "error")
+        return redirect(url_for('index'))
+
+    account_found = False
+    for account in config.get('exchanges', {}).get(exchange_name, {}).get('accounts', []):
+        if account['account_name'] == account_name:
+            account['notifications_enabled'] = not account.get('notifications_enabled', False)
+            account_found = True
+            break
+
+    if account_found:
+        save_config(config)
+    else:
+        flash("Conta não encontrada.", "error")
+
     return redirect(url_for('index'))
 
 
@@ -426,4 +589,5 @@ def process_setup_form():
 
 
 if __name__ == '__main__':
+    init_db()
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

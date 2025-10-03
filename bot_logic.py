@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from pacifica_client import PacificaClient
 from strategies import STRATEGIES, add_all_indicators
+from database import insert_successful_order
 
 
 def calculate_order_amount(capital, entry_price, sl_price, risk_percentage):
@@ -24,23 +25,6 @@ def round_to_increment(value: float, increment: float) -> str:
     increment_dec = Decimal(str(increment))
     rounded_value = (value_dec / increment_dec).quantize(Decimal('1'), rounding=ROUND_HALF_UP) * increment_dec
     return "{:f}".format(rounded_value.normalize())
-
-
-def log_order_to_history(order_data: dict):
-    """Salva os detalhes de uma ordem bem-sucedida em um arquivo JSON."""
-    history_file = "historico.json"
-    try:
-        try:
-            with open(history_file, 'r') as f:
-                history = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            history = []
-        history.append(order_data)
-        with open(history_file, 'w') as f:
-            json.dump(history, f, indent=4)
-    except Exception as e:
-        print(f"ERRO CRITICO: Falha ao salvar no arquivo de historico: {e}")
-
 
 class TradingBot:
     def __init__(self, account_config: dict, global_config: dict, logs_list: list, exchange_name: str):
@@ -285,6 +269,48 @@ class TradingBot:
                                 continue
 
                             df = add_all_indicators(market_data)
+                            # ==================================================================
+                            # INÍCIO - NOVA LÓGICA DE SAÍDA DE EMERGÊNCIA
+                            # ==================================================================
+                            last_candle = df.iloc[-1]
+                            entry_price = float(position.get('entry_price'))
+                            position_side = "long" if position.get('side') == 'bid' else "short"
+
+                            # Recalcula o SL original com base no setup da estratégia
+                            sl_config = setup['stop_loss_config']
+                            sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
+                            last_candle['ATR'] * sl_config['value']
+                            initial_stop_loss_price = entry_price - sl_distance if position_side == 'long' else entry_price + sl_distance
+
+                            emergency_exit = False
+                            closing_side = None
+
+                            if position_side == 'long' and last_candle['low'] < initial_stop_loss_price:
+                                self.log(
+                                    f"SAÍDA DE EMERGÊNCIA: Preço ({last_candle['low']}) ultrapassou o SL inicial da estratégia ({initial_stop_loss_price:.4f}) para {api_symbol}. Fechando a mercado.",
+                                    level='WARNING')
+                                emergency_exit = True
+                                closing_side = "SELL"
+                            elif position_side == 'short' and last_candle['high'] > initial_stop_loss_price:
+                                self.log(
+                                    f"SAÍDA DE EMERGÊNCIA: Preço ({last_candle['high']}) ultrapassou o SL inicial da estratégia ({initial_stop_loss_price:.4f}) para {api_symbol}. Fechando a mercado.",
+                                    level='WARNING')
+                                emergency_exit = True
+                                closing_side = "BUY"
+
+                            if emergency_exit:
+                                # Usa o método create_market_order com reduce_only=True
+                                result = self.client.create_market_order(
+                                    symbol=api_symbol,
+                                    side=closing_side,
+                                    amount=position['amount'],
+                                    reduce_only=True
+                                )
+                                self.log(f"Resultado da ordem de fechamento de emergência: {result}", level='EXECUTION')
+                                continue  # Pula para o próximo setup
+                            # ==================================================================
+                            # FIM - NOVA LÓGICA
+                            # ==================================================================
                             if self._manage_trailing_stop(setup, position, all_open_orders, df):
                                 self.log(f"Ressincronizando estado das ordens para {api_symbol} após TSL.")
                                 all_open_orders = self.client.get_open_orders()
@@ -392,19 +418,58 @@ class TradingBot:
                         take_profit_price_rounded_str = round_to_increment(take_profit_price, tick_size)
 
                         if float(amount_rounded_str) > 0:
-                            log_details = (f"ORDEM LIMITE PREPARADA -> Ativo: {api_symbol}, Lado: {side}, Preço: ${limit_price_str}, Qtd: {amount_rounded_str}, TP: ${take_profit_price_rounded_str}, SL: ${stop_loss_price_rounded_str}")
+                            log_details = (
+                                f"ORDEM LIMITE PREPARADA -> Ativo: {api_symbol}, Lado: {side}, Preço: ${limit_price_str}, Qtd: {amount_rounded_str}, TP: ${take_profit_price_rounded_str}, SL: ${stop_loss_price_rounded_str}")
                             self.log(log_details)
-                            result = self.client.create_limit_order(
-                                symbol=api_symbol, side=side, amount=amount_rounded_str,
-                                price=limit_price_str, take_profit_price=take_profit_price_rounded_str,
-                                stop_loss_price=stop_loss_price_rounded_str, tick_size=tick_size
-                            )
+
+                            # Crie a variável `payload_para_ordem` aqui para logá-la
+                            payload_para_ordem = {
+                                "symbol": api_symbol, "side": side, "amount": amount_rounded_str,
+                                "price": limit_price_str, "take_profit_price": take_profit_price_rounded_str,
+                                "stop_loss_price": stop_loss_price_rounded_str, "tick_size": tick_size
+                            }
+
+                            result = self.client.create_limit_order(**payload_para_ordem)
+
                             self.log(f"Resultado do envio da ordem: {result}", level='EXECUTION')
+
                             if result and result.get('data') and result['data'].get('order_id'):
-                                order_data = result['data']
-                                order_record = {"timestamp_utc": pd.Timestamp.utcnow().isoformat(), "order_id": order_data.get('order_id'), "ativo": api_symbol, "lado": side, "quantidade": amount_rounded_str, "estrategia": strategy_name, "preco_entrada_aprox": limit_price_str, "stop_loss": stop_loss_price_rounded_str, "take_profit": take_profit_price_rounded_str, "risco_percentual": f"{risk_percentage * 100}%", "rrr": f"{rrr}:1"}
-                                log_order_to_history(order_record)
-                                self.log(f"Ordem {order_data.get('order_id')} salva no historico.json")
+                                order_data_response = result['data']
+
+                                # Crie o dicionário completo para o banco de dados
+                                order_record_to_db = {
+                                    # Dados da resposta da API
+                                    "order_id": order_data_response.get('order_id'),
+                                    "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
+                                    "full_payload": payload_para_ordem,
+
+                                    # Dados do contexto do Bot
+                                    "account_name": self.account_name,
+                                    "exchange": self.exchange_name,
+                                    "ativo": api_symbol,
+                                    "lado": side,
+                                    "quantidade": amount_rounded_str,
+
+                                    # "Fotografia" do Setup
+                                    "strategy_name": setup.get('strategy_name'),
+                                    "leverage": setup.get('leverage'),
+                                    "risk_per_trade": setup.get('risk_per_trade'),
+                                    "take_profit_rrr": setup.get('take_profit_rrr'),
+                                    "direction_mode": setup.get('direction_mode'),
+                                    "exit_mode": setup.get('exit_mode'),
+                                    "stop_loss_config": setup.get('stop_loss_config'),
+                                    "trailing_stop_config": setup.get('trailing_stop_config'),
+
+                                    # Preços calculados
+                                    "preco_entrada_aprox": limit_price_str,
+                                    "stop_loss_price": stop_loss_price_rounded_str,
+                                    "take_profit_price": take_profit_price_rounded_str,
+                                }
+
+                                # Insere no banco de dados
+                                insert_successful_order(order_record_to_db)
+                                self.log(
+                                    f"Ordem {order_data_response.get('order_id')} salva no banco de dados de historico.")
                         else:
                             self.log(f"Quantidade da ordem para {api_symbol} é zero.", level='WARNING')
                     else:
