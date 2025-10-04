@@ -16,7 +16,7 @@ from strategies import STRATEGIES
 from pacifica_client import PacificaClient
 from backtester import run_full_backtest
 from database import init_db, sync_order_history, sync_trade_history
-from notifications import check_and_send_close_alerts
+from notifications import check_and_send_close_alerts, check_and_send_open_alerts
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -101,6 +101,7 @@ def hourly_alert_task():
     start_time_ms = int((datetime.now() - timedelta(days=1)).timestamp() * 1000)
 
     sync_all_trade_histories(start_time_ms)
+    check_and_send_open_alerts()
     check_and_send_close_alerts()
 
 
@@ -181,10 +182,12 @@ def manage_account():
         for i, acc in enumerate(accounts_in_exchange):
             if acc['account_name'] == original_name:
                 account_details['markets_to_trade'] = acc.get('markets_to_trade', [])
+                account_details['notifications_enabled'] = acc.get('notifications_enabled', False)
                 accounts_in_exchange[i] = account_details
                 break
     else:
         account_details['markets_to_trade'] = []
+        account_details['notifications_enabled'] = False
         accounts_in_exchange.append(account_details)
 
     exchanges_config.setdefault(selected_exchange, {})['accounts'] = accounts_in_exchange
@@ -476,6 +479,8 @@ def save_telegram_settings():
     config['telegram']['bot_token'] = token
     config['telegram']['chat_id'] = chat_id
     config['telegram']['enabled'] = bool(token and chat_id)
+    config['telegram']['notify_on_open'] = request.form.get('notify_on_open') == 'true'
+    config['telegram']['notify_on_close'] = request.form.get('notify_on_close') == 'true'
 
     save_config(config)
     flash("Configurações do Telegram salvas com sucesso!", "success")

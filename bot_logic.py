@@ -115,15 +115,19 @@ class TradingBot:
                                  o.get('symbol', '').upper() == api_symbol and o.get('order_type', '').startswith(
                                      'stop_loss')), None)
 
+        # Cache de info do mercado (tick_size, etc)
         if not self.market_info_cache.get(api_symbol):
             self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
         tick_size = float(self.market_info_cache[api_symbol].get('tick_size', 0.01))
 
+        # === Criação do SL inicial ===
         if not current_sl_order:
             self.log(f"Posição em {api_symbol} sem SL. Criando SL inicial com base no setup.", level='WARNING')
 
             sl_config = setup['stop_loss_config']
-            sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle['ATR'] * sl_config['value']
+            sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle[
+                                                                                                         'ATR'] * \
+                                                                                                     sl_config['value']
             initial_sl_price = entry_price - sl_distance if position_side == 'long' else entry_price + sl_distance
             sl_rounded_str = round_to_increment(initial_sl_price, tick_size)
 
@@ -137,6 +141,7 @@ class TradingBot:
         current_sl_price = float(current_sl_order['stop_price'])
         potential_new_sl = None
 
+        # === Tipo 1: Breakeven ===
         if tsl_config['type'] == 'breakeven':
             if (position_side == 'long' and current_sl_price >= entry_price) or \
                     (position_side == 'short' and current_sl_price <= entry_price):
@@ -144,8 +149,9 @@ class TradingBot:
 
             trigger_rrr = tsl_config.get('breakeven_trigger_rrr', 1.0)
             sl_config = setup['stop_loss_config']
-            initial_sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle['ATR'] * sl_config['value']
-            breakeven_buffer = 0.1 * last_candle['ATR']
+            initial_sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
+            last_candle['ATR'] * sl_config['value']
+            breakeven_buffer = 0.15 * last_candle['ATR']  # 🔹 ligeiramente maior
 
             if position_side == 'long':
                 breakeven_trigger_price = entry_price + (initial_sl_distance * trigger_rrr)
@@ -156,32 +162,45 @@ class TradingBot:
                 if last_candle['low'] <= breakeven_trigger_price:
                     potential_new_sl = entry_price - breakeven_buffer
 
-            if potential_new_sl: self.log(
-                f"Breakeven ATINGIDO para {api_symbol}! Potencial novo SL: ${potential_new_sl:.4f}")
+            if potential_new_sl:
+                self.log(f"Breakeven ATINGIDO para {api_symbol}! Potencial novo SL: ${potential_new_sl:.4f}")
 
+        # === Tipo 2: Trailing por ATR ===
         elif tsl_config['type'] == 'atr':
             high_water_mark = market_data['high'].max()
             low_water_mark = market_data['low'].min()
             atr_multiple = tsl_config.get('atr_multiple', 2.0)
-            safety_buffer = 2 * last_candle['ATR']
+
+            # 🔹 Maior folga: stop mais distante
+            safety_buffer = 3.0 * last_candle['ATR']  # antes era 2x
+
             if position_side == 'long':
                 potential_new_sl = high_water_mark - (atr_multiple * last_candle['ATR'])
                 potential_new_sl = min(potential_new_sl, last_candle['close'] - safety_buffer)
+                potential_new_sl -= 0.5 * last_candle['ATR']  # 🔹 afasta ainda mais o SL
             else:
                 potential_new_sl = low_water_mark + (atr_multiple * last_candle['ATR'])
                 potential_new_sl = max(potential_new_sl, last_candle['close'] + safety_buffer)
+                potential_new_sl += 0.5 * last_candle['ATR']
 
-        if potential_new_sl is None: return False
-        if tsl_config.get('type') == 'atr' and ((position_side == 'long' and potential_new_sl < entry_price) or (position_side == 'short' and potential_new_sl > entry_price)):
+        if potential_new_sl is None:
             return False
 
+        # Evita SLs piores que o entry_price
+        if tsl_config.get('type') == 'atr' and ((position_side == 'long' and potential_new_sl < entry_price) or (
+                position_side == 'short' and potential_new_sl > entry_price)):
+            return False
+
+        # Verifica se o novo SL é uma melhora
         is_improvement = (position_side == 'long' and potential_new_sl > current_sl_price) or \
                          (position_side == 'short' and potential_new_sl < current_sl_price)
 
         if is_improvement:
-            update_buffer = 0.5 * last_candle['ATR']
+            # 🔹 Só move se o ganho for relevante (evita updates curtos)
+            update_buffer = 1.0 * last_candle['ATR']  # antes era 0.5x
             if abs(potential_new_sl - current_sl_price) < update_buffer:
                 return False
+
             self.log(
                 f"TRAILING STOP (UPDATE) para {api_symbol}: Movendo de ${current_sl_price:.4f} para ${potential_new_sl:.4f}")
 
@@ -192,6 +211,7 @@ class TradingBot:
                 self.log(f"FALHA ao cancelar SL antigo para {api_symbol}. Abortando TSL.", level='ERROR')
                 return False
 
+            # Opcional: remove TP quando trail é atualizado
             if tsl_config.get('remove_tp_on_trail', False):
                 tp_order = next((o for o in all_open_orders if
                                  o.get('symbol', '').upper() == api_symbol and o.get('order_type').startswith(
@@ -207,6 +227,7 @@ class TradingBot:
             self.log(f"Resultado da criação do novo SL: {result}", level='EXECUTION')
             if result and result.get('success'):
                 return True
+
         return False
 
     def run(self):

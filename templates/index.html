@@ -199,7 +199,7 @@
                     <button class="notification-btn" onclick="toggleNotificationsForm()" title="Gerenciar Notificações"><i class="fas fa-bell"></i> Notificações</button>
                 </div>
             </div>
-            <div class="table-container">
+             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
@@ -267,15 +267,23 @@
             <h2>Gerenciar Notificações do Telegram</h2>
             <form action="/save_telegram_settings" method="post">
                 <div class="form-row">
-                    <label title="Token do seu bot do Telegram, obtido com o @BotFather." style="flex-grow: 1;">
+                    <label title="Token do seu bot do Telegram, obtido com o @BotFather.">
                         Token do Bot
                         <input type="text" name="telegram_bot_token" value="{{ telegram_config.bot_token or '' }}">
                     </label>
-                </div>
-                <div class="form-row">
-                    <label title="ID do chat para onde as notificações serão enviadas." style="flex-grow: 1;">
+                    <label title="ID do chat para onde as notificações serão enviadas.">
                         Chat ID
                         <input type="text" name="telegram_chat_id" value="{{ telegram_config.chat_id or '' }}">
+                    </label>
+                </div>
+                <div class="form-row">
+                    <label title="Notificar no Telegram quando uma posição for aberta." style="flex-direction: row; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="notify_on_open" value="true" {{ 'checked' if telegram_config.get('notify_on_open') }}>
+                        Notificar Abertura
+                    </label>
+                    <label title="Notificar no Telegram quando uma posição for fechada." style="flex-direction: row; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="notify_on_close" value="true" {{ 'checked' if telegram_config.get('notify_on_close') }}>
+                        Notificar Fechamento
                     </label>
                 </div>
                 <div class="form-row">
@@ -569,7 +577,6 @@
             const section = document.getElementById('add-account-section');
             if (section.style.display === 'none' || is_editing) {
                 section.style.display = 'block';
-                section.scrollIntoView({ behavior: 'smooth' });
             } else {
                 section.style.display = 'none';
                 resetAccountForm();
@@ -580,7 +587,6 @@
             const section = document.getElementById('notifications-section');
             if (section.style.display === 'none') {
                 section.style.display = 'block';
-                section.scrollIntoView({ behavior: 'smooth' });
             } else {
                 section.style.display = 'none';
             }
@@ -603,6 +609,8 @@
             form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
             form.querySelector('[name="agent_private_key"]').value = ''; // Clear private key for security
             form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
+            form.querySelector('[name="notify_on_open"]').checked = accountData.notify_on_open || false;
+            form.querySelector('[name="notify_on_close"]').checked = accountData.notify_on_close || false;
             toggleAddAccountForm(true);
         }
 
