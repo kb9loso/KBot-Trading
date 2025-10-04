@@ -299,7 +299,7 @@
                 <h2>Conta: {{ displayed_account.account_name }}</h2>
                 <div class="account-info">
                     {% if account_info %}
-                        <div class="metric-card"><i class="fas fa-wallet metric-icon"></i><div class="metric-text"><strong>SALDO</strong><span>${{ "%.2f"|format(account_info.balance|float) }}</span></div></div>
+                        <div class="metric-card"><i class="fas fa-exchange-alt metric-icon"></i><div class="metric-text"><strong>MOVIMENTAÇÕES</strong><span>${{ "%.2f"|format(movements|float) }}</span></div></div>
                         <div class="metric-card"><i class="fas fa-chart-line metric-icon"></i><div class="metric-text"><strong>PATRIMÔNIO</strong><span>${{ "%.2f"|format(account_info.account_equity|float) }}</span></div></div>
                         <div class="metric-card clickable-card" onclick="togglePositionsTable()">
                             <i class="fas fa-box-open metric-icon"></i>

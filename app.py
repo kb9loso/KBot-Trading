@@ -27,6 +27,7 @@ bot_logs = [{"timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "account
 account_info_cache = {}
 dashboard_metrics_cache = {}
 open_positions_cache = {}
+movements_cache  = {}
 last_refresh_error = {}
 backtest_result_cache = {}
 running_bots = {}
@@ -242,6 +243,14 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
 
         account_info_cache[account_name] = account_info
 
+        # Busca e processa o histórico de saldo
+        balance_history = client.get_account_balance_history(limit=1000)  # Busca os últimos 1000 eventos
+        if balance_history:
+            total_movements = sum(float(item['amount']) for item in balance_history)
+            movements_cache[account_name] = total_movements
+        else:
+            movements_cache[account_name] = 0
+
         end_time = int(time.time() * 1000)
         start_time = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
         trade_history = client.get_trade_history(start_time, end_time)
@@ -290,6 +299,7 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
         account_info_cache[account_name] = None
         dashboard_metrics_cache[account_name] = None
         open_positions_cache[account_name] = []
+        movements_cache[account_name] = []
 
 
 @app.route('/')
@@ -350,6 +360,7 @@ def index():
         displayed_account=displayed_account,
         setups_to_display=all_setups,
         account_info=account_info_cache.get(displayed_account['account_name']) if displayed_account else None,
+        movements=movements_cache.get(displayed_account['account_name']) if displayed_account else None,
         dashboard=dashboard_metrics_cache.get(displayed_account['account_name']) if displayed_account else None,
         error_message=last_refresh_error.get(
             displayed_account['account_name']) if displayed_account else "Nenhuma conta configurada.",

@@ -98,6 +98,19 @@ class PacificaClient:
         secret_64 = bytes(kp)
         return base58.b58encode(secret_64).decode("ascii")
 
+    def get_account_balance_history(self, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """Get account balance history."""
+        path = '/api/v1/account/balance/history'
+        params = {
+            'account': self.main_public_key,
+            'limit': limit,
+            'offset': offset
+        }
+        response_data = self._make_request('GET', path, params=params)
+        if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
+            return response_data['data']
+        return []
+
     def create_subaccount(self, new_sub_private_key_b58: str) -> Dict:
         path = '/api/v1/account/subaccount/create'
         sub_keypair = Keypair.from_base58_string(new_sub_private_key_b58)
