@@ -165,23 +165,38 @@ class TradingBot:
             if potential_new_sl:
                 self.log(f"Breakeven ATINGIDO para {api_symbol}! Potencial novo SL: ${potential_new_sl:.4f}")
 
-        # === Tipo 2: Trailing por ATR ===
         elif tsl_config['type'] == 'atr':
+            # === Calcula parâmetros dinâmicos ===
+            atr_value = last_candle['ATR']
+            current_price = last_candle['close']
+
+            # 🔹 1. Usa o multiplicador fixo do setup (não ajustável pelo usuário)
+            atr_multiple = setup.get('tsl_atr_multiple', 2.0)
+
+            # 🔹 2. Adapta folga se volatilidade estiver muito alta
+            atr_pct = atr_value / current_price
+            if atr_pct > 0.015:
+                atr_multiple *= 1.25  # mercado volátil → SL mais distante
+            elif atr_pct < 0.005:
+                atr_multiple *= 0.9  # mercado calmo → SL mais próximo
+            # 🔹 3. Distância mínima absoluta (proteção)
+            min_distance = max(atr_value * 2, current_price * 0.002)  # 2x ATR ou 0.2%
+            # 🔹 4. Folga adicional para evitar falsos gatilhos
+            safety_buffer = 2.5 * atr_value
             high_water_mark = market_data['high'].max()
             low_water_mark = market_data['low'].min()
-            atr_multiple = tsl_config.get('atr_multiple', 2.0)
-
-            # 🔹 Maior folga: stop mais distante
-            safety_buffer = 3.0 * last_candle['ATR']  # antes era 2x
-
+            # === Cálculo do novo SL ===
             if position_side == 'long':
-                potential_new_sl = high_water_mark - (atr_multiple * last_candle['ATR'])
-                potential_new_sl = min(potential_new_sl, last_candle['close'] - safety_buffer)
-                potential_new_sl -= 0.5 * last_candle['ATR']  # 🔹 afasta ainda mais o SL
+                potential_new_sl = high_water_mark - (atr_multiple * atr_value)
+                potential_new_sl = min(potential_new_sl, current_price - safety_buffer)
+                # 🔹 Garante distância mínima
+                if current_price - potential_new_sl < min_distance:
+                    potential_new_sl = current_price - min_distance
             else:
-                potential_new_sl = low_water_mark + (atr_multiple * last_candle['ATR'])
-                potential_new_sl = max(potential_new_sl, last_candle['close'] + safety_buffer)
-                potential_new_sl += 0.5 * last_candle['ATR']
+                potential_new_sl = low_water_mark + (atr_multiple * atr_value)
+                potential_new_sl = max(potential_new_sl, current_price + safety_buffer)
+                if potential_new_sl - current_price < min_distance:
+                    potential_new_sl = current_price + min_distance
 
         if potential_new_sl is None:
             return False
@@ -320,7 +335,7 @@ class TradingBot:
                                 closing_side = "BUY"
 
                             if emergency_exit:
-                                # Usa o método create_market_order com reduce_only=True
+                                # Usa o metodo create_market_order com reduce_only=True
                                 result = self.client.create_market_order(
                                     symbol=api_symbol,
                                     side=closing_side,
@@ -397,7 +412,7 @@ class TradingBot:
                         continue
 
                     df = add_all_indicators(market_data)
-                    last_candle, prev_candle = df.iloc[-2], df.iloc[-3]
+                    last_candle, prev_candle = df.iloc[-1], df.iloc[-2]
                     side = None
                     direction_mode = setup.get('direction_mode', 'long_short')
                     if direction_mode in ['long_short', 'long_only'] and strategy_logic['long_entry'](last_candle, prev_candle):

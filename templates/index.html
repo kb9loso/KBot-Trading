@@ -368,7 +368,16 @@
                                 <td>{{ market.take_profit_rrr }}:1 RRR</td><td>{{ market.exit_mode | capitalize }}</td>
                                 <td>{{ 'Long & Short' if market.direction_mode == 'long_short' else 'Long Only' if market.direction_mode == 'long_only' else 'Short Only' }}</td>
                                 <td>
-                                    {% set tsl = market.trailing_stop_config %}{{ tsl.type|capitalize if tsl and tsl.type != 'none' else 'Nenhum' }}{% if tsl and tsl.type == 'breakeven' %} ({{ tsl.breakeven_trigger_rrr }} RRR){% elif tsl and tsl.type == 'atr' %} ({{ tsl.atr_multiple }}x){% endif %}
+                                    {% set tsl = market.trailing_stop_config %}
+                                    {% if tsl and tsl.type != 'none' %}
+                                        {% if tsl.type == 'breakeven' %}
+                                            BEP ({{ "%.1f"|format(tsl.breakeven_trigger_rrr) }} RRR)
+                                        {% else %}
+                                            {{ tsl.type|upper }}
+                                        {% endif %}
+                                    {% else %}
+                                        Nenhum
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="action-buttons-container">
@@ -401,9 +410,9 @@
                     <div class="form-row">
                          <label title="'Passivo' usa apenas SL/TP. 'Ativo' permite que a estratégia feche a posição se o sinal reverter.">Modo Saída<select name="exit_mode" style="width: 120px;" onchange="toggleTslSection(this.value)"><option value="passivo">Passivo</option><option value="ativo">Ativo</option></select></label>
                         <div id="tsl-section" style="display:none; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
-                            <label title="Um stop loss que se move a favor do preço para proteger os lucros.">Trailing Stop<select name="tsl_type" onchange="toggleTslOptions(this.value)" style="width: 180px;"><option value="none">Nenhum</option><option value="breakeven">Breakeven</option><option value="atr">ATR Trailing</option></select></label>
+                            <label title="Um stop loss que se move a favor do preço para proteger os lucros.">Trailing Stop<select name="tsl_type" onchange="toggleTslOptions(this.value)" style="width: 180px;"><option value="none">Nenhum</option><option value="breakeven">Break-Even Point</option><option value="atr">ATR Trailing</option></select></label>
                             <div id="tsl-breakeven-options" style="display:none;"><label title="(Breakeven) Relação Risco/Retorno que, ao ser atingida, move o Stop Loss para o preço de entrada.">Acionar em (RRR)<input type="number" name="tsl_breakeven_trigger" value="1.0" step="0.1" class="value-input"></label></div>
-                            <div id="tsl-atr-options" style="display:none;"><label title="(ATR Trailing) Fator que multiplica o valor do ATR para definir a distância do trailing stop.">Múltiplo ATR<input type="number" name="tsl_atr_multiple" value="2.0" step="0.1" class="value-input"></label></div>
+                            <div id="tsl-atr-options" style="display:none;"></div>
                             <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado."><input type="checkbox" name="remove_tp_on_trail" value="true">Remover TP</label>
                         </div>
                     </div>
@@ -537,24 +546,25 @@
 
             const exitModeSelect = form.querySelector('[name="exit_mode"]');
             exitModeSelect.value = setupData.exit_mode;
-            exitModeSelect.dispatchEvent(new Event('change'));
 
-            setTimeout(() => {
-                const tslConfig = setupData.trailing_stop_config;
-                const tslTypeSelect = form.querySelector('[name="tsl_type"]');
-                if (tslConfig && tslConfig.type !== 'none') {
-                    tslTypeSelect.value = tslConfig.type;
-                    if (tslConfig.type === 'breakeven') {
-                        form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
-                    } else if (tslConfig.type === 'atr') {
-                        form.querySelector('[name="tsl_atr_multiple"]').value = tslConfig.atr_multiple;
-                    }
-                    form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
-                } else {
-                    tslTypeSelect.value = 'none';
+            // Garante que a seção principal do TSL seja exibida ou ocultada corretamente
+            toggleTslSection(setupData.exit_mode);
+
+            const tslConfig = setupData.trailing_stop_config;
+            const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+
+            if (tslConfig && tslConfig.type !== 'none') {
+                tslTypeSelect.value = tslConfig.type;
+                if (tslConfig.type === 'breakeven') {
+                    form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
                 }
-                tslTypeSelect.dispatchEvent(new Event('change'));
-            }, 50);
+                form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
+            } else {
+                tslTypeSelect.value = 'none';
+            }
+
+            // Garante que as opções específicas (como o RRR) sejam exibidas ou ocultadas
+            toggleTslOptions(tslTypeSelect.value);
 
             form.scrollIntoView({ behavior: 'smooth' });
         }
@@ -609,8 +619,6 @@
             form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
             form.querySelector('[name="agent_private_key"]').value = ''; // Clear private key for security
             form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
-            form.querySelector('[name="notify_on_open"]').checked = accountData.notify_on_open || false;
-            form.querySelector('[name="notify_on_close"]').checked = accountData.notify_on_close || false;
             toggleAddAccountForm(true);
         }
 

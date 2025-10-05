@@ -7,6 +7,7 @@ STRATEGIES = {
         "description": "Busca entrar no início de tendências rápidas, confirmando a força com ADX e o momento com RSI.",
         "timeframe": "15m",
         "min_candles": 50,
+        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: p['EMA_9'] < p['EMA_21'] and c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 55 and c['ADX'] > 20,
         "short_entry": lambda c, p: p['EMA_9'] > p['EMA_21'] and c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 45 and c['ADX'] > 20,
         # Saída aprimorada: exige que o RSI também confirme a perda de momentum.
@@ -16,6 +17,7 @@ STRATEGIES = {
         "description": "Entra em movimentos fortes quando o MACD cruza, com confirmação de tendência (ADX) e viés de preço (VWAP).",
         "timeframe": "15m",
         "min_candles": 50,
+        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['ADX'] > 20 and c['close'] > c['VWAP'],
         "short_entry": lambda c, p: p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['ADX'] > 20 and c['close'] < c['VWAP'],
         # Saída aprimorada: exige que o MACD não apenas cruze a linha de sinal, mas também o eixo zero.
@@ -25,6 +27,7 @@ STRATEGIES = {
         "description": "Estratégia de scalping que busca saídas de condições de sobrevenda/sobrecompra a favor de uma microtendência.",
         "timeframe": "15m",
         "min_candles": 30,
+        "tsl_atr_multiple": 2.0,
         "long_entry": lambda c, p: c['EMA_9'] > c['EMA_21'] and p['STOCH_K'] < 20 and c['STOCH_K'] > p['STOCH_D'] and c['close'] > c['VWAP'],
         "short_entry": lambda c, p: c['EMA_9'] < c['EMA_21'] and p['STOCH_K'] > 80 and c['STOCH_K'] < p['STOCH_D'] and c['close'] < c['VWAP'],
         # Saída aprimorada: Sai quando o estocástico cruza sua linha de sinal (%D) na zona oposta, confirmando a exaustão.
@@ -34,6 +37,7 @@ STRATEGIES = {
         "description": "Entra em rompimentos de volatilidade (Bandas de Bollinger) confirmados por volume e momento (MACD).",
         "timeframe": "15m",
         "min_candles": 30,
+        "tsl_atr_multiple": 2.0,
         "long_entry": lambda c, p: c['close'] > c['BB_upper'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] > c['MACD_signal'],
         "short_entry": lambda c, p: c['close'] < c['BB_lower'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] < c['MACD_signal'],
         # Saída Lógica: Sair quando o preço retorna à média é uma boa prática para breakouts. Sem alteração.
@@ -43,6 +47,7 @@ STRATEGIES = {
         "description": "Estratégia de Swing Trade que busca pegar o corpo principal de tendências de médio prazo no gráfico de 1 hora.",
         "timeframe": "1h",
         "min_candles": 60,
+        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: p['EMA_21'] < p['EMA_50'] and c['EMA_21'] > c['EMA_50'] and c['ADX'] > 25,
         "short_entry": lambda c, p: p['EMA_21'] > p['EMA_50'] and c['EMA_21'] < c['EMA_50'] and c['ADX'] > 25,
         # Saída aprimorada: Usa um cruzamento de médias mais rápido (9/21) como um "aviso prévio" para sair da tendência.
@@ -52,6 +57,7 @@ STRATEGIES = {
         "description": "Busca reversões em extremos de mercado, mas aguarda uma confirmação de que o preço está reagindo antes de entrar.",
         "timeframe": "1h",
         "min_candles": 30,
+        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: p['close'] < p['BB_lower'] and c['close'] > p['BB_lower'] and c['RSI_9'] < 30,
         "short_entry": lambda c, p: p['close'] > p['BB_upper'] and c['close'] < c['BB_upper'] and c['RSI_9'] > 70,
         # Saída Lógica: Sair quando o preço atinge a média é o objetivo da reversão. Sem alteração.
@@ -61,6 +67,7 @@ STRATEGIES = {
         "description": "Entra em tendências fortes e estabelecidas, aproveitando pullbacks (correções) até a média móvel para comprar.",
         "timeframe": "1h",
         "min_candles": 60,
+        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: c['EMA_9'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and p['low'] <= p['EMA_21'] and c['close'] > c['EMA_21'] and c['ADX'] > 25,
         "short_entry": lambda c, p: c['EMA_9'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and p['high'] >= p['EMA_21'] and c['close'] < c['EMA_21'] and c['ADX'] > 25,
         # Saída aprimorada: O sinal de saída é o enfraquecimento da tendência de médio prazo (cruzamento 21/50), não apenas a de curto prazo.
@@ -70,6 +77,7 @@ STRATEGIES = {
         "description": "Estratégia de scalping visando muitas operações, saídas rápidas. Direcional: long ou short.",
         "timeframe": "1m",
         "min_candles": 50,
+        "tsl_atr_multiple": 3.5,
         "long_entry": lambda c, p: c['close'] > c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] < 60,
         "short_entry": lambda c, p: c['close'] < c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] > 40,
         # Saída Lógica: A lógica original já era robusta para scalping (saída rápida por preço ou exaustão). Sem alteração.
@@ -79,21 +87,11 @@ STRATEGIES = {
         "description": "Entrada quando o MACD cruza confirmando força do RSI, filtrado por tendência válida (ADX).",
         "timeframe": "1h",
         "min_candles": 100,  # MACD(26), RSI(14) e ADX(14)
+        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: (p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['RSI_14'] > 52 and c['ADX'] > 20), # confirma tendência
         "short_entry": lambda c, p: (p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['RSI_14'] < 48 and c['ADX'] > 20),
         "exit": lambda c, p, side: ((c['MACD'] < c['MACD_signal'] and c['RSI_14'] < 50) if side == 'long' else (c['MACD'] > c['MACD_signal'] and c['RSI_14'] > 50))
     }
-    # ,
-    #
-    # "10. Bollinger Squeeze Breakout (1h)": {
-    #     "description": "Detecta squeeze de volatilidade e entra no rompimento com confirmação de volume.",
-    #     "timeframe": "1h",
-    #     "min_candles": 150,  # precisa do histórico do BBW + volume médio
-    #     "long_entry": lambda c, p: (p['BBW'] < p['BBW_min_120'] and c['close'] > c['BB_upper'] and c['volume'] > p['volume_mean_20']),
-    #     "short_entry": lambda c, p: (p['BBW'] < p['BBW_min_120'] and c['close'] < c['BB_lower'] and c['volume'] > p['volume_mean_20']
-    #     ),
-    #     "exit": lambda c, p, side: ((c['close'] < c['BB_middle']) if side == 'long' else (c['close'] > c['BB_middle']))
-    # }
 }
 
 

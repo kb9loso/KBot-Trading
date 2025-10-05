@@ -406,13 +406,36 @@ class PacificaClient:
     def get_historical_klines(self, market: str, timeframe: str, limit: int = 200,
                               exchange_name: str = 'binance') -> Any:
         try:
-            exchange = getattr(ccxt, exchange_name)()
+            # Configurações específicas por exchange
+            if exchange_name.lower() == 'binance':
+                exchange = ccxt.binance({
+                    'options': {'defaultType': 'future'},  # mercado de futuros (perp)
+                })
+            elif exchange_name.lower() == 'bybit':
+                exchange = ccxt.bybit({
+                    'options': {'defaultType': 'linear'},  # contratos perp USDT
+                })
+            else:
+                exchange = getattr(ccxt, exchange_name.lower())()
+
+            # Carrega os mercados (necessário para alguns métodos da Bybit)
+            exchange.load_markets()
+
+            # Busca os candles
             klines = exchange.fetch_ohlcv(market, timeframe, limit=limit)
+
+            # Valida se retornou dados
             if not klines:
                 return None
+
+            # Converte para DataFrame
             df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('timestamp', inplace=True)
+            df = df.astype(float)
+
             return df
-        except Exception:
+
+        except Exception as e:
+            print(f"Erro ao buscar dados de {exchange_name}: {e}")
             return None

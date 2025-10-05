@@ -10,16 +10,35 @@ from strategies import STRATEGIES, add_all_indicators
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
+# ==============================================================================
+# ===================== PAINEL DE OTIMIZAÇÃO E CONTROLE ========================
+# ==============================================================================
+
 # Parâmetros padrão para a otimização
 INITIAL_CAPITAL = 100.0
+RISK_PER_TRADE_PCT = 0.01
 STOP_LOSS_LEVELS_PCT = [0.015, 0.02, 0.025, 0.03, 0.04, 0.05]
 TAKE_PROFIT_RRRS = [2.0, 2.5, 3.0, 4.0]
+
+
+# ==============================================================================
+# ======================== FIM DO PAINEL DE CONTROLE ===========================
+# ==============================================================================
 
 
 def get_exchange_data(exchange_id, symbol, timeframe, since_timestamp):
     """Busca dados históricos de uma exchange usando ccxt a partir de um timestamp."""
     try:
-        exchange = getattr(ccxt, exchange_id)()
+        if exchange_id.lower() == 'binance':
+            exchange = ccxt.binance({
+                'options': {'defaultType': 'future'},
+            })
+        elif exchange_id.lower() == 'bybit':
+            exchange = ccxt.bybit({
+                'options': {'defaultType': 'linear'},
+            })
+        else:
+            exchange = getattr(ccxt, exchange_id.lower())()
         if not exchange.has['fetchOHLCV']: return None
 
         all_klines = []
@@ -40,11 +59,15 @@ def get_exchange_data(exchange_id, symbol, timeframe, since_timestamp):
         return None
 
 
-def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy):
-    """Executa o backtest com base na lógica fornecida, sem trailing stop para breakeven."""
+# ==============================================================================
+# ===================== FUNÇÃO run_backtest ATUALIZADA =========================
+# ==============================================================================
+
+def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_trade):
+    """Executa o backtest APENAS com Stop Loss e Take Profit."""
     capital = initial_capital
     position_size = 0.0
-    position_type = 0
+    position_type = 0  # 0: fora, 1: long, -1: short
     entry_price = 0
     trades = []
     stop_loss_price = 0
@@ -52,6 +75,7 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy):
     entry_date = None
 
     min_c = strategy.get('min_candles', 1)
+
     if len(df) < min_c:
         return initial_capital, pd.DataFrame(trades)
 
@@ -59,9 +83,13 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy):
         current_row = df.iloc[i]
         prev_row = df.iloc[i - 1]
 
+        # --- LÓGICA DE GESTÃO DE POSIÇÃO ABERTA (APENAS SL/TP) ---
         if position_type != 0:
             exit_price, result = None, None
-            if position_type == 1:  # Long
+            side = 'long' if position_type == 1 else 'short'
+
+            # Verifica apenas as condições de Stop Loss e Take Profit
+            if side == 'long':
                 if current_row['low'] <= stop_loss_price:
                     exit_price, result = stop_loss_price, 'loss'
                 elif current_row['high'] >= take_profit_price:
@@ -72,17 +100,20 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy):
                 elif current_row['low'] <= take_profit_price:
                     exit_price, result = take_profit_price, 'win'
 
+            # Se uma condição de saída foi atingida, fecha a operação
             if exit_price is not None:
                 pnl = (exit_price - entry_price) * position_size if position_type == 1 else (
                                                                                                         entry_price - exit_price) * position_size
                 capital += pnl
                 trades.append({'entry_date': entry_date, 'exit_date': current_row.name, 'entry_price': entry_price,
-                               'exit_price': exit_price, 'result': result, 'pnl': pnl,
-                               'type': 'long' if position_type == 1 else 'short'})
+                               'exit_price': exit_price, 'result': result, 'pnl': pnl, 'type': side})
+
                 position_type = 0
+
                 if capital <= 0:
                     break
 
+        # --- LÓGICA DE ENTRADA DE POSIÇÃO ---
         if position_type == 0 and capital > 0:
             open_pos = False
             if strategy.get('long_entry') and strategy['long_entry'](current_row, prev_row):
@@ -94,25 +125,46 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy):
 
             if open_pos:
                 entry_price = current_row['close']
-                sl_distance = entry_price * sl_pct
+                sl_distance_in_price = entry_price * sl_pct
+
+                amount_to_risk = capital * risk_per_trade
+                if sl_distance_in_price > 0:
+                    position_size = amount_to_risk / sl_distance_in_price
+                else:
+                    position_size = 0
 
                 if position_type == 1:
-                    stop_loss_price = entry_price - sl_distance
-                    take_profit_price = entry_price + (sl_distance * rrr)
+                    stop_loss_price = entry_price - sl_distance_in_price
+                    take_profit_price = entry_price + (sl_distance_in_price * rrr)
                 else:
-                    stop_loss_price = entry_price + sl_distance
-                    take_profit_price = entry_price - (sl_distance * rrr)
+                    stop_loss_price = entry_price + sl_distance_in_price
+                    take_profit_price = entry_price - (sl_distance_in_price * rrr)
 
-                position_size = (capital * leverage) / entry_price
                 entry_date = current_row.name
 
+    # --- LÓGICA DE FECHAMENTO AO FINAL DOS DADOS ---
     if position_type != 0:
         final_price = df.iloc[-1]['close']
         pnl = (final_price - entry_price) * position_size if position_type == 1 else (
                                                                                                  entry_price - final_price) * position_size
         capital += pnl
+        side = 'long' if position_type == 1 else 'short'
+        trades.append({
+            'entry_date': entry_date,
+            'exit_date': df.index[-1],
+            'entry_price': entry_price,
+            'exit_price': final_price,
+            'result': 'win' if pnl > 0 else 'loss',
+            'pnl': pnl,
+            'type': side
+        })
 
     return capital, pd.DataFrame(trades)
+
+
+# ==============================================================================
+# ======================== FIM DA FUNÇÃO ATUALIZADA ============================
+# ==============================================================================
 
 
 def analyze_performance(initial_capital, final_capital, trades_df):
@@ -124,27 +176,24 @@ def analyze_performance(initial_capital, final_capital, trades_df):
             "Short Trades": 0, "Short Win Rate %": 0, "Short Return %": 0,
         }
 
-    # Métricas Gerais
     net_return = final_capital - initial_capital
-    total_return_pct = (net_return / initial_capital) * 100
+    total_return_pct = (net_return / initial_capital) * 100 if initial_capital > 0 else 0
     total_trades = len(trades_df)
     total_win_rate = (trades_df['result'] == 'win').sum() / total_trades * 100 if total_trades > 0 else 0
 
-    # Métricas de Long
     long_trades = trades_df[trades_df['type'] == 'long']
     long_total = len(long_trades)
     long_wins = (long_trades['result'] == 'win').sum()
     long_win_rate = (long_wins / long_total) * 100 if long_total > 0 else 0
     long_pnl = long_trades['pnl'].sum()
-    long_return_pct = (long_pnl / initial_capital) * 100
+    long_return_pct = (long_pnl / initial_capital) * 100 if initial_capital > 0 else 0
 
-    # Métricas de Short
     short_trades = trades_df[trades_df['type'] == 'short']
     short_total = len(short_trades)
     short_wins = (short_trades['result'] == 'win').sum()
     short_win_rate = (short_wins / short_total) * 100 if short_total > 0 else 0
     short_pnl = short_trades['pnl'].sum()
-    short_return_pct = (short_pnl / initial_capital) * 100
+    short_return_pct = (short_pnl / initial_capital) * 100 if initial_capital > 0 else 0
 
     return {
         "Capital Final": final_capital,
@@ -172,8 +221,6 @@ def run_full_backtest(symbol, leverage):
     except Exception as e:
         print(f"AVISO: Não foi possível ler config.json, usando ['binance'] como padrão. Erro: {e}")
         exchange_priority_list = ['binance']
-
-    start_date_str = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
 
     timeframe_map = {'m': 60, 'h': 3600, 'd': 86400}
     required_timeframes = set(details['timeframe'] for details in STRATEGIES.values())
@@ -226,7 +273,7 @@ def run_full_backtest(symbol, leverage):
         for sl_pct in STOP_LOSS_LEVELS_PCT:
             for rrr in TAKE_PROFIT_RRRS:
                 final_capital, trades_df = run_backtest(df_for_backtest.copy(), INITIAL_CAPITAL, rrr, sl_pct, leverage,
-                                                        logic)
+                                                        logic, RISK_PER_TRADE_PCT)
                 perf = analyze_performance(INITIAL_CAPITAL, final_capital, trades_df)
 
                 if perf["Retorno %"] > best_strategy_return:
