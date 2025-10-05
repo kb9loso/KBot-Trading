@@ -389,6 +389,18 @@ class TradingBot:
 
                     if side:
                         self.log(f"SINAL {side} DETECTADO para {api_symbol} (Estrategia: {strategy_name})")
+                        self.log(
+                            f"Configurando alavancagem e modo de margem para {api_symbol} antes de abrir a ordem...")
+                        try:
+                            leverage_to_set = setup.get('leverage')
+                            self.client.update_leverage(api_symbol, int(leverage_to_set))
+                            self.client.update_margin_mode(api_symbol, is_isolated=True)
+                            self.log(
+                                f"Configurações para {api_symbol} aplicadas: Alavancagem {leverage_to_set}x, Modo ISOLATED.")
+                        except Exception as e:
+                            self.log(f"Falha ao configurar margem/alavancagem para {api_symbol}: {e}", level="ERROR")
+                            continue  # Pula para o próximo setup se a configuração falhar
+                        # --- FIM DA LÓGICA MOVIDA ---
                         if not self.market_info_cache.get(api_symbol):
                             self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
                         market_info = self.market_info_cache[api_symbol]
