@@ -5,3 +5,4 @@ ccxt
 solders
 base58
 APScheduler
+numpy
