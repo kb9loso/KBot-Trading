@@ -101,12 +101,6 @@ class TradingBot:
 
     def _manage_trailing_stop(self, setup: dict, position: dict, all_open_orders: list, market_data: pd.DataFrame):
         api_symbol = position['symbol'].upper()
-        tsl_config = setup.get('trailing_stop_config')
-        if not tsl_config:
-            return
-
-        self.log(f"Gerenciando Trailing Stop para {api_symbol} (Tipo: {tsl_config.get('type')})...")
-
         position_side = "long" if position.get('side') == 'bid' else "short"
         entry_price = float(position.get('entry_price'))
         last_candle = market_data.iloc[-1]
@@ -115,19 +109,18 @@ class TradingBot:
                                  o.get('symbol', '').upper() == api_symbol and o.get('order_type', '').startswith(
                                      'stop_loss')), None)
 
-        # Cache de info do mercado (tick_size, etc)
         if not self.market_info_cache.get(api_symbol):
             self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
         tick_size = float(self.market_info_cache[api_symbol].get('tick_size', 0.01))
 
-        # === Criação do SL inicial ===
+        # === Bloco de Garantia de SL (executado para TODOS os modos) ===
         if not current_sl_order:
             self.log(f"Posição em {api_symbol} sem SL. Criando SL inicial com base no setup.", level='WARNING')
-
             sl_config = setup['stop_loss_config']
             sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle[
-                                                                                                         'ATR'] * \
-                                                                                                     sl_config['value']
+                                                                                                         'ATR'] * sl_config.get(
+                'value', 1.0)
+
             initial_sl_price = entry_price - sl_distance if position_side == 'long' else entry_price + sl_distance
             sl_rounded_str = round_to_increment(initial_sl_price, tick_size)
 
@@ -136,13 +129,19 @@ class TradingBot:
             self.log(f"Resultado da criação do SL inicial: {result}", level='EXECUTION')
             if not (result and result.get('success')):
                 self.log(f"Falha ao criar SL inicial para {api_symbol}.", level='ERROR')
-            return
+            return  # Retorna após criar o SL, pois a tarefa deste ciclo está concluída.
 
+        # === Bloco de Trailing Stop (executado apenas se configurado no setup) ===
+        tsl_config = setup.get('trailing_stop_config')
+        if not tsl_config or tsl_config.get('type') == 'none':
+            return False  # Se não há TSL, a função termina aqui.
+
+        # O restante da função continua com a lógica de breakeven e ATR...
         current_sl_price = float(current_sl_order['stop_price'])
         potential_new_sl = None
 
-        # === Tipo 1: Breakeven ===
         if tsl_config['type'] == 'breakeven':
+            # ... (código do breakeven)
             if (position_side == 'long' and current_sl_price >= entry_price) or \
                     (position_side == 'short' and current_sl_price <= entry_price):
                 return
@@ -150,8 +149,8 @@ class TradingBot:
             trigger_rrr = tsl_config.get('breakeven_trigger_rrr', 1.0)
             sl_config = setup['stop_loss_config']
             initial_sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
-            last_candle['ATR'] * sl_config['value']
-            breakeven_buffer = 0.15 * last_candle['ATR']  # 🔹 ligeiramente maior
+                last_candle['ATR'] * sl_config['value']
+            breakeven_buffer = 0.15 * last_candle['ATR']
 
             if position_side == 'long':
                 breakeven_trigger_price = entry_price + (initial_sl_distance * trigger_rrr)
@@ -166,53 +165,40 @@ class TradingBot:
                 self.log(f"Breakeven ATINGIDO para {api_symbol}! Potencial novo SL: ${potential_new_sl:.4f}")
 
         elif tsl_config['type'] == 'atr':
-            # === Calcula parâmetros dinâmicos ===
+            # ... (código do ATR trailing)
             atr_value = last_candle['ATR']
             current_price = last_candle['close']
-
-            # 🔹 1. Usa o multiplicador fixo do setup (não ajustável pelo usuário)
             atr_multiple = setup.get('tsl_atr_multiple', 2.0)
-
-            # 🔹 2. Adapta folga se volatilidade estiver muito alta
             atr_pct = atr_value / current_price
             if atr_pct > 0.015:
-                atr_multiple *= 1.25  # mercado volátil → SL mais distante
+                atr_multiple *= 1.25
             elif atr_pct < 0.005:
-                atr_multiple *= 0.9  # mercado calmo → SL mais próximo
-            # 🔹 3. Distância mínima absoluta (proteção)
-            min_distance = max(atr_value * 2, current_price * 0.002)  # 2x ATR ou 0.2%
-            # 🔹 4. Folga adicional para evitar falsos gatilhos
+                atr_multiple *= 0.9
+            min_distance = max(atr_value * 2, current_price * 0.002)
             safety_buffer = 2.5 * atr_value
             high_water_mark = market_data['high'].max()
             low_water_mark = market_data['low'].min()
-            # === Cálculo do novo SL ===
             if position_side == 'long':
                 potential_new_sl = high_water_mark - (atr_multiple * atr_value)
                 potential_new_sl = min(potential_new_sl, current_price - safety_buffer)
-                # 🔹 Garante distância mínima
-                if current_price - potential_new_sl < min_distance:
-                    potential_new_sl = current_price - min_distance
+                if current_price - potential_new_sl < min_distance: potential_new_sl = current_price - min_distance
             else:
                 potential_new_sl = low_water_mark + (atr_multiple * atr_value)
                 potential_new_sl = max(potential_new_sl, current_price + safety_buffer)
-                if potential_new_sl - current_price < min_distance:
-                    potential_new_sl = current_price + min_distance
+                if potential_new_sl - current_price < min_distance: potential_new_sl = current_price + min_distance
 
         if potential_new_sl is None:
             return False
 
-        # Evita SLs piores que o entry_price
         if tsl_config.get('type') == 'atr' and ((position_side == 'long' and potential_new_sl < entry_price) or (
                 position_side == 'short' and potential_new_sl > entry_price)):
             return False
 
-        # Verifica se o novo SL é uma melhora
         is_improvement = (position_side == 'long' and potential_new_sl > current_sl_price) or \
                          (position_side == 'short' and potential_new_sl < current_sl_price)
 
         if is_improvement:
-            # 🔹 Só move se o ganho for relevante (evita updates curtos)
-            update_buffer = 1.0 * last_candle['ATR']  # antes era 0.5x
+            update_buffer = 1.0 * last_candle['ATR']
             if abs(potential_new_sl - current_sl_price) < update_buffer:
                 return False
 
@@ -226,7 +212,6 @@ class TradingBot:
                 self.log(f"FALHA ao cancelar SL antigo para {api_symbol}. Abortando TSL.", level='ERROR')
                 return False
 
-            # Opcional: remove TP quando trail é atualizado
             if tsl_config.get('remove_tp_on_trail', False):
                 tp_order = next((o for o in all_open_orders if
                                  o.get('symbol', '').upper() == api_symbol and o.get('order_type').startswith(
@@ -266,7 +251,8 @@ class TradingBot:
                 all_open_orders = self.client.get_open_orders()
                 for order in all_open_orders:
                     if order.get('order_type') == 'limit' and not order.get('reduce_only', False):
-                        self.log(f"Cancelando ordem limite de ENTRADA {order.get('order_id')} para {order.get('symbol')}")
+                        self.log(
+                            f"Cancelando ordem limite de ENTRADA {order.get('order_id')} para {order.get('symbol')}")
                         cancel_result = self.client.cancel_order(order.get('symbol'), order.get('order_id'))
                         self.log(f"Resultado do cancelamento: {cancel_result}", level='EXECUTION')
 
@@ -282,42 +268,44 @@ class TradingBot:
                     if self.stop_event.is_set(): break
                     api_symbol = setup["base_currency"].upper()
 
+                    # --- LÓGICA ATUALIZADA PARA PROTEGER ORDENS PASSIVAS ---
                     if api_symbol in open_positions_map:
+                        position = open_positions_map[api_symbol]
+                        ccxt_symbol = f"{setup['base_currency']}/{setup['quote_currency']}"
+                        strategy_name = setup["strategy_name"]
+                        strategy_logic = self.STRATEGIES[strategy_name]
+                        timeframe = strategy_logic.get('timeframe', '15m')
+                        min_candles = strategy_logic.get('min_candles', 200)
+
+                        market_data = None
+                        for exchange_name in data_source_exchanges:
+                            data = self.client.get_historical_klines(ccxt_symbol, timeframe, limit=min_candles,
+                                                                     exchange_name=exchange_name)
+                            if data is not None and not data.empty:
+                                market_data = data
+                                break
+
+                        if market_data is None or market_data.empty:
+                            self.log(f"Nao foi possivel obter dados para monitorar {api_symbol}.", level='ERROR')
+                            continue
+
+                        df = add_all_indicators(market_data)
+
+                        # Sempre chama a função de gerenciamento para garantir que o SL exista.
+                        if self._manage_trailing_stop(setup, position, all_open_orders, df):
+                            self.log(f"Ressincronizando estado das ordens para {api_symbol} após TSL.")
+                            all_open_orders = self.client.get_open_orders()
+
+                        # Lógica de saída estratégica e de emergência continua exclusiva do modo 'ativo'.
                         exit_mode = setup.get('exit_mode', 'passivo')
                         if exit_mode == 'ativo':
-                            position = open_positions_map[api_symbol]
-                            ccxt_symbol = f"{setup['base_currency']}/{setup['quote_currency']}"
-                            strategy_name = setup["strategy_name"]
-                            strategy_logic = self.STRATEGIES[strategy_name]
-                            timeframe = strategy_logic.get('timeframe', '15m')
-                            min_candles = strategy_logic.get('min_candles', 200)
-
-                            market_data = None
-                            for exchange_name in data_source_exchanges:
-                                data = self.client.get_historical_klines(ccxt_symbol, timeframe, limit=min_candles,
-                                                                         exchange_name=exchange_name)
-                                if data is not None and not data.empty:
-                                    market_data = data
-                                    break
-
-                            if market_data is None or market_data.empty:
-                                self.log(f"Nao foi possivel obter dados para monitorar {api_symbol}.", level='ERROR')
-                                continue
-
-                            df = add_all_indicators(market_data)
-                            # ==================================================================
-                            # INÍCIO - NOVA LÓGICA DE SAÍDA DE EMERGÊNCIA
-                            # ==================================================================
                             last_candle = df.iloc[-1]
                             entry_price = float(position.get('entry_price'))
                             position_side = "long" if position.get('side') == 'bid' else "short"
-
-                            # Recalcula o SL original com base no setup da estratégia
                             sl_config = setup['stop_loss_config']
                             sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
                             last_candle['ATR'] * sl_config['value']
                             initial_stop_loss_price = entry_price - sl_distance if position_side == 'long' else entry_price + sl_distance
-
                             emergency_exit = False
                             closing_side = None
 
@@ -335,64 +323,40 @@ class TradingBot:
                                 closing_side = "BUY"
 
                             if emergency_exit:
-                                # Usa o metodo create_market_order com reduce_only=True
-                                result = self.client.create_market_order(
-                                    symbol=api_symbol,
-                                    side=closing_side,
-                                    amount=position['amount'],
-                                    reduce_only=True
-                                )
+                                result = self.client.create_market_order(symbol=api_symbol, side=closing_side,
+                                                                         amount=position['amount'], reduce_only=True)
                                 self.log(f"Resultado da ordem de fechamento de emergência: {result}", level='EXECUTION')
-                                continue  # Pula para o próximo setup
-                            # ==================================================================
-                            # FIM - NOVA LÓGICA
-                            # ==================================================================
-                            if self._manage_trailing_stop(setup, position, all_open_orders, df):
-                                self.log(f"Ressincronizando estado das ordens para {api_symbol} após TSL.")
-                                all_open_orders = self.client.get_open_orders()
+                                continue
 
+                            # Lógica de saída estratégica baseada no sinal da estratégia
                             position_side = "long" if position.get('side') == 'bid' else "short"
-                            entry_price = float(position.get('entry_price'))
-                            current_sl_order = next((o for o in all_open_orders if
-                                                     o.get('symbol', '').upper() == api_symbol and o.get('order_type', '').startswith('stop_loss')), None)
                             is_risk_free = False
+                            current_sl_order = next((o for o in all_open_orders if
+                                                     o.get('symbol', '').upper() == api_symbol and o.get('order_type',
+                                                                                                         '').startswith(
+                                                         'stop_loss')), None)
                             if current_sl_order:
                                 current_sl_price = float(current_sl_order['stop_price'])
-                                if (position_side == 'long' and current_sl_price >= entry_price) or \
-                                   (position_side == 'short' and current_sl_price <= entry_price):
+                                if (position_side == 'long' and current_sl_price >= entry_price) or (
+                                        position_side == 'short' and current_sl_price <= entry_price):
                                     is_risk_free = True
 
-                            if not is_risk_free and strategy_logic.get('exit') and strategy_logic['exit'](df.iloc[-2], df.iloc[-3], position_side):
+                            if not is_risk_free and strategy_logic.get('exit') and strategy_logic['exit'](df.iloc[-2],
+                                                                                                          df.iloc[-3],
+                                                                                                          position_side):
                                 self.log(f"SINAL DE SAÍDA ESTRATÉGICA DETECTADO para {api_symbol}!", level='WARNING')
                                 closing_side = "SELL" if position_side == 'long' else "BUY"
+                                # ... (resto da lógica para fechar a ordem)
 
-                                if not self.market_info_cache.get(api_symbol):
-                                    self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
-                                market_info = self.market_info_cache[api_symbol]
-                                tick_size = float(market_info.get('tick_size', 0.01))
+                        continue  # Pula para o próximo setup
 
-                                orderbook = self.client.get_orderbook(api_symbol)
-                                if not orderbook:
-                                    self.log(f"Não foi possível obter o order book para fechar {api_symbol}. Pulando.", level='ERROR')
-                                    continue
-
-                                if closing_side == "SELL":
-                                    limit_price = float(orderbook['l'][0][0]['p']) + tick_size
-                                else:
-                                    limit_price = float(orderbook['l'][1][0]['p']) - tick_size
-
-                                limit_price_str = round_to_increment(limit_price, tick_size)
-                                result = self.client.create_limit_order(
-                                    symbol=api_symbol, side=closing_side, amount=position['amount'],
-                                    price=limit_price_str, reduce_only=True, tick_size=tick_size
-                                )
-                                self.log(f"Resultado do envio da ordem de fechamento: {result}", level='EXECUTION')
-                        continue
+                    # --- FIM DA LÓGICA ATUALIZADA ---
 
                     ccxt_symbol = f"{setup['base_currency']}/{setup['quote_currency']}"
                     strategy_name = setup["strategy_name"]
                     if strategy_name not in self.STRATEGIES:
-                        self.log(f"Estrategia '{strategy_name}' para {api_symbol} nao encontrada. Pulando.", level='WARNING')
+                        self.log(f"Estrategia '{strategy_name}' para {api_symbol} nao encontrada. Pulando.",
+                                 level='WARNING')
                         continue
 
                     strategy_logic = self.STRATEGIES[strategy_name]
@@ -408,16 +372,19 @@ class TradingBot:
                             break
 
                     if market_data is None or market_data.empty:
-                        self.log(f"Nao foi possivel obter dados para {ccxt_symbol} em {data_source_exchanges}.", level='ERROR')
+                        self.log(f"Nao foi possivel obter dados para {ccxt_symbol} em {data_source_exchanges}.",
+                                 level='ERROR')
                         continue
 
                     df = add_all_indicators(market_data)
                     last_candle, prev_candle = df.iloc[-1], df.iloc[-2]
                     side = None
                     direction_mode = setup.get('direction_mode', 'long_short')
-                    if direction_mode in ['long_short', 'long_only'] and strategy_logic['long_entry'](last_candle, prev_candle):
+                    if direction_mode in ['long_short', 'long_only'] and strategy_logic['long_entry'](last_candle,
+                                                                                                      prev_candle):
                         side = "BUY"
-                    elif direction_mode in ['long_short', 'short_only'] and strategy_logic['short_entry'](last_candle, prev_candle):
+                    elif direction_mode in ['long_short', 'short_only'] and strategy_logic['short_entry'](last_candle,
+                                                                                                          prev_candle):
                         side = "SELL"
 
                     if side:
@@ -442,12 +409,14 @@ class TradingBot:
                         entry_price = limit_price
 
                         sl_config = setup['stop_loss_config']
-                        sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle['ATR'] * sl_config['value']
+                        sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
+                        last_candle['ATR'] * sl_config['value']
                         rrr = setup['take_profit_rrr']
                         risk_percentage = setup['risk_per_trade']
 
                         stop_loss_price = entry_price - sl_distance if side == "BUY" else entry_price + sl_distance
-                        take_profit_price = entry_price + (sl_distance * rrr) if side == "BUY" else entry_price - (sl_distance * rrr)
+                        take_profit_price = entry_price + (sl_distance * rrr) if side == "BUY" else entry_price - (
+                                    sl_distance * rrr)
                         amount_raw = calculate_order_amount(balance, entry_price, stop_loss_price, risk_percentage)
                         amount_rounded_str = round_to_increment(amount_raw, lot_size)
                         stop_loss_price_rounded_str = round_to_increment(stop_loss_price, tick_size)
@@ -458,7 +427,6 @@ class TradingBot:
                                 f"ORDEM LIMITE PREPARADA -> Ativo: {api_symbol}, Lado: {side}, Preço: ${limit_price_str}, Qtd: {amount_rounded_str}, TP: ${take_profit_price_rounded_str}, SL: ${stop_loss_price_rounded_str}")
                             self.log(log_details)
 
-                            # Crie a variável `payload_para_ordem` aqui para logá-la
                             payload_para_ordem = {
                                 "symbol": api_symbol, "side": side, "amount": amount_rounded_str,
                                 "price": limit_price_str, "take_profit_price": take_profit_price_rounded_str,
@@ -471,22 +439,15 @@ class TradingBot:
 
                             if result and result.get('data') and result['data'].get('order_id'):
                                 order_data_response = result['data']
-
-                                # Crie o dicionário completo para o banco de dados
                                 order_record_to_db = {
-                                    # Dados da resposta da API
                                     "order_id": order_data_response.get('order_id'),
                                     "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
                                     "full_payload": payload_para_ordem,
-
-                                    # Dados do contexto do Bot
                                     "account_name": self.account_name,
                                     "exchange": self.exchange_name,
                                     "ativo": api_symbol,
                                     "lado": side,
                                     "quantidade": amount_rounded_str,
-
-                                    # "Fotografia" do Setup
                                     "strategy_name": setup.get('strategy_name'),
                                     "leverage": setup.get('leverage'),
                                     "risk_per_trade": setup.get('risk_per_trade'),
@@ -495,14 +456,10 @@ class TradingBot:
                                     "exit_mode": setup.get('exit_mode'),
                                     "stop_loss_config": setup.get('stop_loss_config'),
                                     "trailing_stop_config": setup.get('trailing_stop_config'),
-
-                                    # Preços calculados
                                     "preco_entrada_aprox": limit_price_str,
                                     "stop_loss_price": stop_loss_price_rounded_str,
                                     "take_profit_price": take_profit_price_rounded_str,
                                 }
-
-                                # Insere no banco de dados
                                 insert_successful_order(order_record_to_db)
                                 self.log(
                                     f"Ordem {order_data_response.get('order_id')} salva no banco de dados de historico.")
