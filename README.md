@@ -52,7 +52,12 @@ Com o ambiente ativado, execute o comando abaixo para instalar todas as bibliote
 ```bash
   pip install -r requirements.txt
 ```
-#### Passo 3: Execução
+### Passo 3: Criar o Arquivo de Configuração
+
+1.  Na pasta do projeto, encontre o ficheiro `config.example.json`.
+2.  Faça uma cópia deste ficheiro e renomeie-a para `config.json`. **Não precisa de editar o conteúdo deste arquivo manualmente.**
+
+#### Passo 4: Execução
 
 Ainda no terminal com o ambiente ativado, inicie a aplicação:
 
@@ -72,12 +77,7 @@ Com o bot em execução pela primeira vez, siga os passos abaixo.
 2.  Na barra de endereços, digite: `http://127.0.0.1:5000`
 3.  Pressione Enter. A interface web do KBot deverá carregar.
 
-### Passo 2: Criar o Arquivo de Configuração
-
-1.  Na pasta do projeto, encontre o ficheiro `config.example.json`.
-2.  Faça uma cópia deste ficheiro e renomeie-a para `config.json`. **Não precisa de editar o conteúdo deste arquivo manualmente.**
-
-### Passo 3: Adicionar a Sua Conta na Interface
+### Passo 2: Adicionar a Sua Conta na Interface
 
 1.  Na interface web, clique no botão **"Nova Conta"**.
 2.  Preencha o formulário com o nome da conta e as suas chaves de API (`main_public_key` e `agent_private_key`).
