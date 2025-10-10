@@ -342,7 +342,7 @@
                             <tr>
                                 <td>{{ market.account_name }}</td>
                                 <td>
-                                    <div class="asset-cell-container"><i class="fas fa-circle status-icon {{ 'open' if market.base_currency in open_position_symbols else 'idle' }}"></i><span>{{ market.base_currency }}</span></div>
+                                    <div class="asset-cell-container"><i class="fas fa-circle status-icon {{ 'open' if market.base_currency in open_positions_by_account.get(market.account_name, []) else 'idle' }}"></i><span>{{ market.base_currency }}</span></div>
                                 </td>
                                 <td>{{ market.strategy_name }}</td><td>{{ market.leverage }}x</td>
                                 <td>{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>

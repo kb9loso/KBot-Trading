@@ -443,7 +443,10 @@ def index():
                 setups_to_display.append(market)
             open_positions_to_display.extend(open_positions_cache.get(acc['account_name'], []))
 
-    open_position_symbols = {pos['symbol'].upper() for pos in open_positions_to_display}
+    open_positions_by_account = {}
+    for acc_name, positions in open_positions_cache.items():
+        if positions:
+            open_positions_by_account[acc_name] = {pos['symbol'].upper() for pos in positions}
 
     selected_level = request.args.get('log_level', 'all')
     selected_account_log = request.args.get('log_account', 'all')
@@ -464,7 +467,7 @@ def index():
         setups_to_display=setups_to_display,
         open_positions_details=open_positions_to_display,
         selected_account_filter=selected_account_name,
-        open_position_symbols=open_position_symbols,
+        open_positions_by_account=open_positions_by_account,
         last_updated=datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         backtest_result=backtest_result_cache,
         last_backtest_symbol=last_backtest_symbol,

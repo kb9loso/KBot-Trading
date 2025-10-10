@@ -488,9 +488,12 @@ class ApexClient(BaseExchangeClient):
         try:
             orderbook = self.get_orderbook(symbol.split('-')[0])
             if side.upper() == "BUY":
-                price = str(float(orderbook['l'][1][0]['p']) * 1.03)
+                price_raw = float(orderbook['l'][1][0]['p']) * 1.02  # Preço 5% acima do melhor ask
             else:  # SELL
-                price = str(float(orderbook['l'][0][0]['p']) * 0.97)
+                price_raw = float(orderbook['l'][0][0]['p']) * 0.98  # Preço 5% abaixo do melhor bid
+
+            price = round_to_increment(price_raw, tick_size)
+
         except Exception:
             price = "0"  # Fallback em caso de erro
 

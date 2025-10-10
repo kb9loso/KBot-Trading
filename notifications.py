@@ -213,8 +213,9 @@ def check_and_send_close_alerts_apex():
             pnl_formatted = f"{pnl_value:+.2f}"
 
             message = (
-                f"{status_icon} *Posição Fechada (Apex)*\n\n"
+                f"{status_icon} *Posição Fechada*\n\n"
                 f"👤 *Conta:* {escape_markdown(account_name)}\n"
+                f"📦 *Exchange:* Apex\n"
                 f"📈 *Ativo:* {escape_markdown(symbol)}\n"
                 f"🧭 *Tipo:* {escape_markdown(trade_type)}\n"
                 f"💰 *PNL Total:* `${escape_markdown(pnl_formatted)}`\n"
