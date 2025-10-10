@@ -1,6 +1,7 @@
 # app.py
 import subprocess
 
+import numpy as np
 import requests
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 import json
@@ -13,10 +14,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from bot_logic import TradingBot
 from strategies import STRATEGIES
-from pacifica_client import PacificaClient
+from exchange_factory import get_client
 from backtester import run_full_backtest
-from database import init_db, sync_order_history, sync_trade_history
-from notifications import check_and_send_close_alerts, check_and_send_open_alerts
+from database import init_db, sync_order_history, sync_trade_history, sync_pnl_history
+from notifications import check_and_send_close_alerts, check_and_send_open_alerts, check_and_send_close_alerts_apex
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -27,7 +28,7 @@ bot_logs = [{"timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "account
 account_info_cache = {}
 dashboard_metrics_cache = {}
 open_positions_cache = {}
-movements_cache  = {}
+weekly_volume_cache = {}
 last_refresh_error = {}
 backtest_result_cache = {}
 running_bots = {}
@@ -69,88 +70,78 @@ def save_config(config):
         json.dump(config, f, indent=4)
 
 
-# ==================================================================
-# INÍCIO - LÓGICA DO AGENDADOR (ATUALIZADA)
-# ==================================================================
 def sync_all_trade_histories(start_time_ms: int):
-    """Função auxiliar para sincronizar o histórico de trades a partir de um timestamp."""
+    """Função auxiliar para sincronizar o histórico de trades de TODAS as contas."""
     print(f"AGENDADOR: Iniciando sincronização de TRADES - {datetime.now()}")
     config = load_config()
-    pacifica_config = config.get('exchanges', {}).get('pacifica', {})
+    for exchange_name, exchange_data in config.get('exchanges', {}).items():
+        for account_config in exchange_data.get('accounts', []):
+            try:
+                client = get_client(exchange_name, account_config)
+                sync_trade_history(client, exchange_name, account_config['account_name'], start_time_ms)
+            except Exception as e:
+                print(f"ERRO na sincronização de trades para {account_config['account_name']}: {e}")
 
-    for account_config in pacifica_config.get('accounts', []):
+
+def sync_apex_pnl_task():
+    """Tarefa agendada para sincronizar o PNL histórico de todas as contas Apex."""
+    print(f"AGENDADOR: Iniciando sincronização de PNL da Apex - {datetime.now()}")
+    config = load_config()
+
+    apex_exchange_data = config.get('exchanges', {}).get('apex', {})
+    if not apex_exchange_data.get('accounts'):
+        return
+
+    # --- INÍCIO DA CORREÇÃO ---
+    # Período de busca alterado para os últimos 7 dias
+    start_time_ms = int((datetime.now() - timedelta(days=7)).timestamp() * 1000)
+    # --- FIM DA CORREÇÃO ---
+
+    for account_config in apex_exchange_data.get('accounts', []):
         try:
-            client = PacificaClient(
-                main_public_key=account_config['main_public_key'],
-                agent_private_key=account_config['agent_private_key']
-            )
-            # Passa o start_time e o account_name para a função de sincronização
-            sync_trade_history(client, 'pacifica', account_config['account_name'], start_time_ms)
+            client = get_client('apex', account_config)
+            sync_pnl_history(client, account_config['account_name'], start_time_ms)
         except Exception as e:
-            print(f"ERRO na sincronização de trades para {account_config['account_name']}: {e}")
-
-
+            print(f"ERRO na sincronização de PNL para {account_config['account_name']}: {e}")
 
 def hourly_alert_task():
     """Tarefa principal que roda de hora em hora."""
     config = load_config()
     if not config.get('telegram', {}).get('enabled', False):
-        # print(f"AGENDADOR HORÁRIO: Notificações do Telegram desativadas. Pulando tarefa. - {datetime.now()}")
         return
 
-    # Calcula o start_time para as últimas 24 horas
     start_time_ms = int((datetime.now() - timedelta(days=1)).timestamp() * 1000)
-
     sync_all_trade_histories(start_time_ms)
     check_and_send_open_alerts()
     check_and_send_close_alerts()
+    check_and_send_close_alerts_apex()
 
 
 def full_daily_sync_task():
-    """Tarefa diária que faz uma sincronização completa (trades e ordens)."""
-    print("\n" + "=" * 50)
+    """Tarefa diária que faz uma sincronização completa (trades e ordens) para TODAS as contas."""
     print(f"AGENDADOR DIÁRIO: Iniciando tarefa de sincronização COMPLETA - {datetime.now()}")
-    print("=" * 50)
     config = load_config()
-    pacifica_config = config.get('exchanges', {}).get('pacifica', {})
-
-    # Para a tarefa diária, usamos uma janela maior (ex: 90 dias) para garantir a integridade
     daily_start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
 
-    for account_config in pacifica_config.get('accounts', []):
-        try:
-            print(f"Sincronização diária completa para a conta: {account_config['account_name']}")
-            client = PacificaClient(
-                main_public_key=account_config['main_public_key'],
-                agent_private_key=account_config['agent_private_key']
-            )
-            sync_order_history(client, 'pacifica', account_config['account_name'])
-            sync_trade_history(client, 'pacifica', account_config['account_name'], daily_start_time_ms)
-        except Exception as e:
-            print(f"ERRO durante a sincronização diária da conta {account_config['account_name']}: {e}")
-    print("=" * 50)
+    for exchange_name, exchange_data in config.get('exchanges', {}).items():
+        for account_config in exchange_data.get('accounts', []):
+            try:
+                print(f"Sincronização diária completa para a conta: {account_config['account_name']}")
+                client = get_client(exchange_name, account_config)
+                sync_order_history(client, exchange_name, account_config['account_name'])
+                sync_trade_history(client, exchange_name, account_config['account_name'], daily_start_time_ms)
+            except Exception as e:
+                print(f"ERRO durante a sincronização diária da conta {account_config['account_name']}: {e}")
     print("AGENDADOR DIÁRIO: Tarefa de sincronização completa concluída.")
-    print("=" * 50 + "\n")
 
 
-# Configura o agendador
 scheduler = BackgroundScheduler(daemon=True)
-
-# Adiciona a nova tarefa horária
 scheduler.add_job(hourly_alert_task, 'interval', hours=1, next_run_time=datetime.now() + timedelta(seconds=30))
-
-# Mantém a tarefa diária completa
 scheduler.add_job(full_daily_sync_task, 'interval', hours=24, next_run_time=datetime.now() + timedelta(minutes=5))
+scheduler.add_job(sync_apex_pnl_task, 'interval', hours=1, next_run_time=datetime.now() + timedelta(minutes=1))
 
 scheduler.start()
-
-# Garante que o agendador é desligado corretamente ao fechar a aplicação
 atexit.register(lambda: scheduler.shutdown())
-
-
-# ==================================================================
-# FIM - LÓGICA DO AGENDADOR
-# ==================================================================
 
 
 @app.route('/manage_account', methods=['POST'])
@@ -159,11 +150,9 @@ def manage_account():
     exchanges_config = config.get('exchanges', {})
     selected_exchange = request.form['exchange_name']
 
-    # Validação de multi-conta
     exchange_details = exchanges_config.get(selected_exchange, {})
     if not exchange_details.get('multi_account_allowed', False) and len(exchange_details.get('accounts', [])) > 0:
         original_name = request.form.get('original_account_name')
-        # Permite editar, mas não adicionar uma nova se já existir uma
         if not original_name or exchange_details['accounts'][0]['account_name'] != original_name:
             flash(f"A exchange '{selected_exchange}' não permite múltiplas contas.", "error")
             return redirect(url_for('index'))
@@ -171,10 +160,21 @@ def manage_account():
     interval = int(request.form.get('check_interval', 180))
     account_details = {
         "account_name": request.form['account_name'],
-        "main_public_key": request.form['main_public_key'],
-        "agent_private_key": request.form['agent_private_key'],
         "check_interval_seconds": max(interval, 120)
     }
+
+    # --- INÍCIO DA ALTERAÇÃO ---
+    # Adiciona as credenciais específicas de cada exchange
+    if selected_exchange == 'pacifica':
+        account_details["main_public_key"] = request.form.get('main_public_key')
+        account_details["agent_private_key"] = request.form.get('agent_private_key')
+    elif selected_exchange == 'apex':
+        account_details["api_key"] = request.form.get('api_key')
+        account_details["api_secret"] = request.form.get('api_secret')
+        account_details["passphrase"] = request.form.get('passphrase')
+        account_details["zk_seeds"] = request.form.get('zk_seeds')
+        account_details["zk_l2key"] = request.form.get('zk_l2key')
+    # --- FIM DA ALTERAÇÃO ---
 
     original_name = request.form.get('original_account_name')
     accounts_in_exchange = exchange_details.get('accounts', [])
@@ -182,6 +182,15 @@ def manage_account():
     if original_name:
         for i, acc in enumerate(accounts_in_exchange):
             if acc['account_name'] == original_name:
+                # Ao editar, mantém chaves secretas se não forem fornecidas novamente
+                if selected_exchange == 'pacifica' and not account_details["agent_private_key"]:
+                    account_details["agent_private_key"] = acc.get("agent_private_key")
+                elif selected_exchange == 'apex':
+                    if not account_details["api_secret"]: account_details["api_secret"] = acc.get("api_secret")
+                    if not account_details["passphrase"]: account_details["passphrase"] = acc.get("passphrase")
+                    if not account_details["zk_seeds"]: account_details["zk_seeds"] = acc.get("zk_seeds")
+                    if not account_details["zk_l2key"]: account_details["zk_l2key"] = acc.get("zk_l2key")
+
                 account_details['markets_to_trade'] = acc.get('markets_to_trade', [])
                 account_details['notifications_enabled'] = acc.get('notifications_enabled', False)
                 accounts_in_exchange[i] = account_details
@@ -210,77 +219,133 @@ def delete_account(exchange_name, account_name):
 
 
 def calculate_dashboard_metrics(trades: list) -> dict:
-    if not trades: return None
-    closed_trades = [t for t in trades if t.get('side', '').startswith('close_') and t.get('pnl') is not None]
-    if not closed_trades: return {"total_trades": 0, "total_pnl": 0, "win_rate": 0, "avg_win": 0, "avg_loss": 0,
-                                  "total_fees": 0}
-    winning_trades_pnl = [float(t['pnl']) for t in closed_trades if float(t['pnl']) > 0]
-    losing_trades_pnl = [float(t['pnl']) for t in closed_trades if float(t['pnl']) <= 0]
-    total_fees = sum(float(t.get('fee', 0.0)) for t in closed_trades)
-    total_trades = len(closed_trades)
-    total_pnl = sum(winning_trades_pnl) + sum(losing_trades_pnl)
+    if not trades:
+        return {"total_trades": 0, "total_pnl": 0, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "total_fees": 0}
+
+    df = pd.DataFrame(trades)
+
+    # Garante que as colunas numéricas tenham o tipo correto, tratando possíveis erros
+    df['pnl'] = pd.to_numeric(df['pnl'], errors='coerce').fillna(0)
+    df['fee'] = pd.to_numeric(df['fee'], errors='coerce').fillna(0)
+
+    # 1. Filtra apenas para trades de fechamento
+    closed_trades_df = df[df['side'].str.startswith('close_', na=False)].copy()
+
+    if closed_trades_df.empty:
+        return {"total_trades": 0, "total_pnl": 0, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "total_fees": 0}
+
+    if 'order_id' in closed_trades_df.columns:
+        operations_df = closed_trades_df.groupby('order_id').agg(
+            pnl=('pnl', 'sum'),
+            fee=('fee', 'sum')
+        ).reset_index()
+    else:
+        operations_df = closed_trades_df
+
+    if operations_df.empty:
+        return {"total_trades": 0, "total_pnl": 0, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "total_fees": 0}
+
+    winning_trades_pnl = operations_df[operations_df['pnl'] > 0]['pnl'].tolist()
+    losing_trades_pnl = operations_df[operations_df['pnl'] <= 0]['pnl'].tolist()
+
+    total_fees = operations_df['fee'].sum()
+    total_trades = len(operations_df)
+    total_pnl = operations_df['pnl'].sum()
     win_rate = (len(winning_trades_pnl) / total_trades) * 100 if total_trades > 0 else 0
     avg_win = sum(winning_trades_pnl) / len(winning_trades_pnl) if winning_trades_pnl else 0
     avg_loss = sum(losing_trades_pnl) / len(losing_trades_pnl) if losing_trades_pnl else 0
-    return {"total_pnl": total_pnl, "total_trades": total_trades, "win_rate": win_rate, "avg_win": avg_win,
-            "avg_loss": avg_loss, "total_fees": total_fees}
+
+    return {
+        "total_pnl": total_pnl,
+        "total_trades": total_trades,
+        "win_rate": win_rate,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "total_fees": total_fees
+    }
+
+
+def _adapt_pnl_history_for_dashboard(pnl_history: list) -> list:
+    """Adapta o formato do histórico de PNL da Apex para o formato esperado pela função de cálculo de métricas."""
+    adapted_trades = []
+    for pnl_entry in pnl_history:
+        # A função calculate_dashboard_metrics precisa de um campo 'pnl' e um campo 'side' que comece com 'close_'
+        if pnl_entry.get('type') == 'CLOSE_POSITION':
+            adapted_trades.append({
+                'pnl': float(pnl_entry.get('totalPnl') or 0.0),
+                'side': 'close_position', # Suficiente para a lógica 'startswith("close_")'
+                'fee': float(pnl_entry.get('fee') or 0.0)
+            })
+    return adapted_trades
 
 
 def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
-    global account_info_cache, dashboard_metrics_cache, open_positions_cache, last_refresh_error
+    """Função genérica para buscar dados da API usando a factory."""
+    global account_info_cache, dashboard_metrics_cache, open_positions_cache, last_refresh_error, weekly_volume_cache
     account_name = account_config['account_name']
     leverage_map = {
         market['base_currency'].upper(): market.get('leverage', 1)
         for market in account_config.get('markets_to_trade', [])
     }
     try:
-        client = PacificaClient(main_public_key=account_config['main_public_key'],
-                                agent_private_key=account_config['agent_private_key'])
+        client = get_client(exchange_name, account_config)
+
         account_info = client.get_account_info()
-
         if not account_info:
-            raise Exception("Falha ao buscar informações da conta.")
-
+            raise Exception("Falha ao buscar informações da conta (retorno vazio).")
         account_info_cache[account_name] = account_info
 
-        # Busca e processa o histórico de saldo
-        balance_history = client.get_account_balance_history(limit=1000)  # Busca os últimos 1000 eventos
-        if balance_history:
-            total_movements = sum(float(item['amount']) for item in balance_history)
-            movements_cache[account_name] = total_movements
-        else:
-            movements_cache[account_name] = 0
+        start_time_7d = int((datetime.now() - timedelta(days=7)).timestamp() * 1000)
+        end_time_7d = int(time.time() * 1000)
 
-        end_time = int(time.time() * 1000)
-        start_time = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
-        trade_history = client.get_trade_history(start_time, end_time)
-        dashboard_metrics_cache[account_name] = calculate_dashboard_metrics(
-            trade_history) if trade_history is not None else None
+        trade_history_7d = client.get_trade_history(start_time_7d, end_time_7d)
+
+        total_volume = 0
+        if trade_history_7d:
+            for trade in trade_history_7d:
+                # Calcula o volume do trade: quantidade * preço de entrada
+                amount = float(trade.get('amount', 0.0))
+                trade_price = float(trade.get('price', 0.0))
+                total_volume += amount * trade_price
+
+        weekly_volume_cache[account_name] = total_volume
+
+        end_time_30d = int(time.time() * 1000)
+        start_time_30d = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
+
+        if exchange_name == 'apex':
+            pnl_history = client.get_pnl_history(start_time_30d, end_time_30d)
+            trades_for_metrics = _adapt_pnl_history_for_dashboard(pnl_history)
+        else:
+            trades_for_metrics = client.get_trade_history(start_time_30d, end_time_30d)
+
+        dashboard_metrics_cache[account_name] = calculate_dashboard_metrics(trades_for_metrics)
 
         open_positions_list = client.get_open_positions()
         open_positions_details = []
         if open_positions_list:
-            all_prices = client.get_current_prices()
+            symbols_to_fetch = [pos['symbol'] for pos in open_positions_list]
+            all_prices = client.get_current_prices(symbols=symbols_to_fetch)
             all_open_orders = client.get_open_orders()
-            prices_map = {p['symbol'].upper(): float(p['mark']) for p in all_prices if 'mark' in p}
+            prices_map = {p['symbol'].upper().split('-')[0]: float(p.get('mark', p.get('price', 0))) for p in all_prices
+                          if p.get('mark') or p.get('price')}
+
             for pos in open_positions_list:
                 symbol, entry_price = pos['symbol'].upper(), float(pos['entry_price'])
-                leverage = leverage_map.get(symbol, 1)  # Usa 1x como padrão se não encontrar
-
+                leverage = leverage_map.get(symbol, 1)
                 current_price = prices_map.get(symbol, 0.0)
-                sl_order = next((o for o in all_open_orders if
-                                 o.get('symbol', '').upper() == symbol and o.get('order_type', '').startswith(
-                                     'stop_loss')), None)
-                tp_order = next((o for o in all_open_orders if
-                                 o.get('symbol', '').upper() == symbol and o.get('order_type', '').startswith(
-                                     'take_profit')), None)
 
-                # Calcula a variação de preço percentual
+                sl_order = next((o for o in all_open_orders if
+                                 o.get('symbol', '').upper().split('-')[0] == symbol and
+                                 o.get('order_type', '').startswith('stop')), None)
+                tp_order = next((o for o in all_open_orders if
+                                 o.get('symbol', '').upper().split('-')[0] == symbol and
+                                 o.get('order_type', '').startswith('take_profit')), None)
+
                 price_change_pct = ((current_price - entry_price) / entry_price) * 100 if pos.get(
                     'side') == 'bid' else ((entry_price - current_price) / entry_price) * 100 if entry_price > 0 else 0
-
-                # Aplica a alavancagem para obter o PnL (ROI) real
                 pnl_pct = price_change_pct * leverage
+
                 pos.update({
                     'account_name': account_name,
                     'current_price': current_price,
@@ -291,7 +356,7 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
                 })
                 open_positions_details.append(pos)
         open_positions_cache[account_name] = open_positions_details
-        last_refresh_error[account_name] = None
+        last_refresh_error.pop(account_name, None)
     except Exception as e:
         error_msg = f"Erro ao buscar dados para a conta {account_name}: {e}"
         print(f"ERRO FATAL ao buscar dados da API: {e}")
@@ -299,7 +364,7 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
         account_info_cache[account_name] = None
         dashboard_metrics_cache[account_name] = None
         open_positions_cache[account_name] = []
-        movements_cache[account_name] = []
+        weekly_volume_cache[account_name] = 0
 
 
 @app.route('/')
@@ -318,38 +383,74 @@ def index():
             acc['exchange_name'] = ex_name
             all_accounts.append(acc)
 
-    # Filtros de Log
-    selected_level = request.args.get('log_level', 'all')
-    selected_account = request.args.get('log_account', 'all')
-
-    filtered_logs = bot_logs
-    if selected_level != 'all':
-        filtered_logs = [log for log in filtered_logs if log.get('level') == selected_level]
-    if selected_account != 'all':
-        filtered_logs = [log for log in filtered_logs if log.get('account') == selected_account]
-
-    log_levels = sorted(list(set(log.get('level') for log in bot_logs)))
-    log_accounts = sorted(list(set(log.get('account') for log in bot_logs if log.get('account'))))
-
-    # Dados da conta a ser exibida (a primeira por padrão)
-    displayed_account = all_accounts[0] if all_accounts else None
-
-    # Coletando todos os setups e posições
-    all_setups = []
-    all_open_positions = []
-    open_position_symbols = set()
-
-    if all_accounts:
-        for acc in all_accounts:
+    # --- INÍCIO DA CORREÇÃO ---
+    # A busca de dados agora é feita apenas uma vez, dentro do fetch_and_cache
+    for acc in all_accounts:
+        if acc['account_name'] not in account_info_cache:  # Evita recarregar a cada refresh
             fetch_and_cache_api_data(acc, acc['exchange_name'])
 
+    selected_account_name = request.args.get('account', 'all')
+    accounts_to_process = []
+
+    if all_accounts:
+        if selected_account_name == 'all' or not any(
+                acc['account_name'] == selected_account_name for acc in all_accounts):
+            accounts_to_process = all_accounts
+        else:
+            account_config = next((acc for acc in all_accounts if acc['account_name'] == selected_account_name), None)
+            if account_config:
+                accounts_to_process.append(account_config)
+
+    # Agrega os dados a partir do CACHE, em vez de fazer novas chamadas de API
+    account_info_to_display = {}
+    dashboard_to_display = {}
+    volume_to_display = 0
+    setups_to_display = []
+    open_positions_to_display = []
+
+    if accounts_to_process:
+        total_equity = sum(
+            account_info_cache.get(acc['account_name'], {}).get('account_equity', 0) for acc in accounts_to_process if
+            acc['account_name'] in account_info_cache and account_info_cache[acc['account_name']])
+        total_available = sum(
+            account_info_cache.get(acc['account_name'], {}).get('available_to_spend', 0) for acc in accounts_to_process
+            if acc['account_name'] in account_info_cache and account_info_cache[acc['account_name']])
+        account_info_to_display = {'account_equity': total_equity, 'available_to_spend': total_available}
+        volume_to_display = sum(weekly_volume_cache.get(acc['account_name'], 0) for acc in accounts_to_process)
+
+        # Agrega as métricas do dashboard a partir do cache
+        cached_dashboards = [dashboard_metrics_cache.get(acc['account_name']) for acc in accounts_to_process if
+                             dashboard_metrics_cache.get(acc['account_name'])]
+        if cached_dashboards:
+            dashboard_to_display = {
+                "total_pnl": sum(d['total_pnl'] for d in cached_dashboards),
+                "total_trades": sum(d['total_trades'] for d in cached_dashboards),
+                "win_rate": np.average([d['win_rate'] for d in cached_dashboards],
+                                       weights=[d['total_trades'] for d in cached_dashboards]) if sum(
+                    d['total_trades'] for d in cached_dashboards) > 0 else 0,
+                "avg_win": np.average([d['avg_win'] for d in cached_dashboards],
+                                      weights=[d['win_rate'] for d in cached_dashboards]) if sum(
+                    d['win_rate'] for d in cached_dashboards) > 0 else 0,
+                "avg_loss": np.average([d['avg_loss'] for d in cached_dashboards],
+                                       weights=[100 - d['win_rate'] for d in cached_dashboards]) if sum(
+                    100 - d['win_rate'] for d in cached_dashboards) > 0 else 0,
+                "total_fees": sum(d['total_fees'] for d in cached_dashboards)
+            }
+
+        for acc in accounts_to_process:
             for market in acc.get('markets_to_trade', []):
                 market['account_name'] = acc['account_name']
-                all_setups.append(market)
+                setups_to_display.append(market)
+            open_positions_to_display.extend(open_positions_cache.get(acc['account_name'], []))
 
-            positions = open_positions_cache.get(acc['account_name'], [])
-            all_open_positions.extend(positions)
-            open_position_symbols.update({pos['symbol'].upper() for pos in positions})
+    open_position_symbols = {pos['symbol'].upper() for pos in open_positions_to_display}
+
+    selected_level = request.args.get('log_level', 'all')
+    selected_account_log = request.args.get('log_account', 'all')
+    filtered_logs = [log for log in bot_logs if (selected_level == 'all' or log.get('level') == selected_level) and (
+            selected_account_log == 'all' or log.get('account') == selected_account_log)]
+    log_levels = sorted(list(set(log.get('level') for log in bot_logs)))
+    log_accounts = sorted(list(set(log.get('account') for log in bot_logs if log.get('account'))))
 
     return render_template(
         'index.html',
@@ -357,26 +458,24 @@ def index():
         exchanges_data=exchanges,
         exchanges_allowed=exchanges_allowed,
         running_bots=running_bots.keys(),
-        displayed_account=displayed_account,
-        setups_to_display=all_setups,
-        account_info=account_info_cache.get(displayed_account['account_name']) if displayed_account else None,
-        movements=movements_cache.get(displayed_account['account_name']) if displayed_account else None,
-        dashboard=dashboard_metrics_cache.get(displayed_account['account_name']) if displayed_account else None,
-        error_message=last_refresh_error.get(
-            displayed_account['account_name']) if displayed_account else "Nenhuma conta configurada.",
-        strategy_names=strategy_names,
+        account_info=account_info_to_display,
+        volume_7d=volume_to_display,
+        dashboard=dashboard_to_display,
+        setups_to_display=setups_to_display,
+        open_positions_details=open_positions_to_display,
+        selected_account_filter=selected_account_name,
+        open_position_symbols=open_position_symbols,
         last_updated=datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         backtest_result=backtest_result_cache,
         last_backtest_symbol=last_backtest_symbol,
-        open_position_symbols=open_position_symbols,
-        open_positions_details=all_open_positions,
         logs=filtered_logs,
         log_levels=log_levels,
         log_accounts=log_accounts,
         selected_level=selected_level,
-        selected_account=selected_account,
+        selected_account=selected_account_log,
         version_info=version_info,
-        telegram_config=telegram_config
+        telegram_config=telegram_config,
+        strategy_names=strategy_names
     )
 
 
@@ -387,6 +486,20 @@ def get_logs():
 
 @app.route('/refresh_all', methods=['POST'])
 def refresh_all():
+    """Limpa todos os caches de dados para forçar uma atualização completa."""
+    global account_info_cache, dashboard_metrics_cache, open_positions_cache, weekly_volume_cache, last_refresh_error
+    account_info_cache.clear()
+    dashboard_metrics_cache.clear()
+    open_positions_cache.clear()
+    weekly_volume_cache.clear()
+    last_refresh_error.clear()
+
+    bot_logs.append({
+        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "account": "Sistema",
+        "level": "INFO",
+        "message": "Forçando a atualização de todos os dados das contas..."
+    })
     return redirect(url_for('index'))
 
 
@@ -407,6 +520,7 @@ def stop_all():
 
 
 def start_bot_logic(account_name, exchange_name):
+    """Inicia a thread do bot para uma conta específica."""
     global running_bots, bot_logs
     if account_name not in running_bots:
         config = load_config()
@@ -416,14 +530,13 @@ def start_bot_logic(account_name, exchange_name):
         if account_config:
             try:
                 print(f"Sincronizando histórico para a conta {account_name} antes de iniciar o bot...")
-                client = PacificaClient(
-                    main_public_key=account_config['main_public_key'],
-                    agent_private_key=account_config['agent_private_key']
-                )
-                # Sincroniza o histórico de ordens
+                # --- ALTERAÇÃO PRINCIPAL AQUI ---
+                # Substitui a chamada hardcoded pela factory
+                client = get_client(exchange_name, account_config)
+                # --- FIM DA ALTERAÇÃO ---
+
                 sync_order_history(client, exchange_name, account_name)
 
-                # Sincroniza o histórico de trades dos últimos 90 dias
                 start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
                 sync_trade_history(client, exchange_name, account_name, start_time_ms)
                 print(f"Sincronização para {account_name} concluída.")
@@ -433,12 +546,12 @@ def start_bot_logic(account_name, exchange_name):
                 bot_logs.append(
                     {"timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "account": "Sistema", "level": "ERROR",
                      "message": error_msg})
-            # --- FIM DA ALTERAÇÃO ---
 
             bot_instance_local = TradingBot(account_config, config, bot_logs, exchange_name)
             bot_thread_local = threading.Thread(target=bot_instance_local.run, daemon=True)
             bot_thread_local.start()
             running_bots[account_name] = {"instance": bot_instance_local, "thread": bot_thread_local}
+
 
 
 def stop_bot_logic(account_name):
@@ -508,16 +621,27 @@ def toggle_notifications(exchange_name, account_name):
         return redirect(url_for('index'))
 
     account_found = False
-    for account in config.get('exchanges', {}).get(exchange_name, {}).get('accounts', []):
-        if account['account_name'] == account_name:
-            account['notifications_enabled'] = not account.get('notifications_enabled', False)
-            account_found = True
-            break
+    try:
+        # Acessa a lista de contas da exchange específica
+        accounts_list = config['exchanges'][exchange_name]['accounts']
+
+        # Itera com um índice para garantir a modificação no objeto original
+        for i, account in enumerate(accounts_list):
+            if account['account_name'] == account_name:
+                # Modifica o valor diretamente na lista usando o índice
+                current_status = account.get('notifications_enabled', False)
+                accounts_list[i]['notifications_enabled'] = not current_status
+                account_found = True
+                break
+    except KeyError:
+        # Caso a exchange ou a lista de contas não exista
+        flash(f"Configuração para a exchange '{exchange_name}' não encontrada.", "error")
+        return redirect(url_for('index'))
 
     if account_found:
         save_config(config)
     else:
-        flash("Conta não encontrada.", "error")
+        flash(f"Conta '{account_name}' não encontrada na exchange '{exchange_name}'.", "error")
 
     return redirect(url_for('index'))
 

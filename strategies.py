@@ -1,26 +1,25 @@
 # strategies.py
 import pandas as pd
 import numpy as np
+from data_fetcher import get_historical_klines
 
 STRATEGIES = {
     "1. Tendencia Rapida (15m)": {
-        "description": "Busca entrar no início de tendências rápidas, confirmando a força com ADX e o momento com RSI.",
+        "description": "Busca entrar no início de tendências rápidas, filtrado pela EMA 200 para operar a favor da tendência principal.",
         "timeframe": "15m",
-        "min_candles": 50,
+        "min_candles": 200, # Aumentado para EMA 200
         "tsl_atr_multiple": 2.5,
-        "long_entry": lambda c, p: p['EMA_9'] < p['EMA_21'] and c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 55 and c['ADX'] > 20,
-        "short_entry": lambda c, p: p['EMA_9'] > p['EMA_21'] and c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 45 and c['ADX'] > 20,
-        # Saída aprimorada: exige que o RSI também confirme a perda de momentum.
+        "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['EMA_9'] < p['EMA_21'] and c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 55 and c['ADX'] > 20,
+        "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['EMA_9'] > p['EMA_21'] and c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 45 and c['ADX'] > 20,
         "exit": lambda c, p, side: (c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 48) if side == 'long' else (c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 52)
     },
     "2. Momentum Explosivo (15m)": {
-        "description": "Entra em movimentos fortes quando o MACD cruza, com confirmação de tendência (ADX) e viés de preço (VWAP).",
+        "description": "Entra em movimentos fortes quando o MACD cruza, filtrado pela EMA 200.",
         "timeframe": "15m",
-        "min_candles": 50,
+        "min_candles": 200, # Aumentado para EMA 200
         "tsl_atr_multiple": 2.5,
-        "long_entry": lambda c, p: p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['ADX'] > 20 and c['close'] > c['VWAP'],
-        "short_entry": lambda c, p: p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['ADX'] > 20 and c['close'] < c['VWAP'],
-        # Saída aprimorada: exige que o MACD não apenas cruze a linha de sinal, mas também o eixo zero.
+        "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['ADX'] > 20 and c['close'] > c['VWAP'],
+        "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['ADX'] > 20 and c['close'] < c['VWAP'],
         "exit": lambda c, p, side: (c['MACD'] < 0) if side == 'long' else (c['MACD'] > 0)
     },
     "3. Scalping Intraday (15m)": {
@@ -30,143 +29,188 @@ STRATEGIES = {
         "tsl_atr_multiple": 2.0,
         "long_entry": lambda c, p: c['EMA_9'] > c['EMA_21'] and p['STOCH_K'] < 20 and c['STOCH_K'] > p['STOCH_D'] and c['close'] > c['VWAP'],
         "short_entry": lambda c, p: c['EMA_9'] < c['EMA_21'] and p['STOCH_K'] > 80 and c['STOCH_K'] < p['STOCH_D'] and c['close'] < c['VWAP'],
-        # Saída aprimorada: Sai quando o estocástico cruza sua linha de sinal (%D) na zona oposta, confirmando a exaustão.
         "exit": lambda c, p, side: (c['STOCH_K'] > 75 and c['STOCH_K'] < c['STOCH_D']) if side == 'long' else (c['STOCH_K'] < 25 and c['STOCH_K'] > c['STOCH_D'])
     },
     "4. Breakout Curto (15m)": {
-        "description": "Entra em rompimentos de volatilidade (Bandas de Bollinger) confirmados por volume e momento (MACD).",
+        "description": "Versão robusta: busca rompimentos confirmados (Bollinger + Volume + MACD), mas filtra ruído com ATR e tendência (EMA_50).",
         "timeframe": "15m",
-        "min_candles": 30,
-        "tsl_atr_multiple": 2.0,
-        "long_entry": lambda c, p: c['close'] > c['BB_upper'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] > c['MACD_signal'],
-        "short_entry": lambda c, p: c['close'] < c['BB_lower'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] < c['MACD_signal'],
-        # Saída Lógica: Sair quando o preço retorna à média é uma boa prática para breakouts. Sem alteração.
-        "exit": lambda c, p, side: (c['close'] < c['BB_middle']) if side == 'long' else (c['close'] > c['BB_middle'])
+        "min_candles": 150,
+        "tsl_atr_multiple": 2.5,
+        "long_entry": lambda c, p: p['close'] > p['BB_upper'] and c['close'] > p['close'] and c['close'] > c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] > c['MACD_signal'] and c['ATR'] < c['ATR_MA'] * 1.3,
+        "short_entry": lambda c, p: p['close'] < p['BB_lower'] and c['close'] < p['close'] and c['close'] < c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] < c['MACD_signal'] and c['ATR'] < c['ATR_MA'] * 1.3,
+        "exit": lambda c, p, side: c['BBW'] < c['BBW_min_120'] * 1.2 or c['ATR'] < c['ATR_MA'] * 0.9
     },
     "5. Swing Curto (1h)": {
-        "description": "Estratégia de Swing Trade que busca pegar o corpo principal de tendências de médio prazo no gráfico de 1 hora.",
+        "description": "Estratégia de Swing Trade que busca pegar o corpo principal de tendências, agora filtrada pela EMA 200.",
         "timeframe": "1h",
-        "min_candles": 60,
+        "min_candles": 200, # Aumentado para EMA 200
         "tsl_atr_multiple": 3.0,
-        "long_entry": lambda c, p: p['EMA_21'] < p['EMA_50'] and c['EMA_21'] > c['EMA_50'] and c['ADX'] > 25,
-        "short_entry": lambda c, p: p['EMA_21'] > p['EMA_50'] and c['EMA_21'] < c['EMA_50'] and c['ADX'] > 25,
-        # Saída aprimorada: Usa um cruzamento de médias mais rápido (9/21) como um "aviso prévio" para sair da tendência.
+        "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['EMA_21'] < p['EMA_50'] and c['EMA_21'] > c['EMA_50'] and c['ADX'] > 25,
+        "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['EMA_21'] > p['EMA_50'] and c['EMA_21'] < c['EMA_50'] and c['ADX'] > 25,
         "exit": lambda c, p, side: (c['EMA_9'] < c['EMA_21']) if side == 'long' else (c['EMA_9'] > c['EMA_21'])
     },
     "6. Reversao Forte (1h)": {
-        "description": "Busca reversões em extremos de mercado, mas aguarda uma confirmação de que o preço está reagindo antes de entrar.",
+        "description": "Busca reversões em extremos de mercado. Não utiliza filtro de tendência para poder operar contra ela.",
         "timeframe": "1h",
         "min_candles": 30,
         "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: p['close'] < p['BB_lower'] and c['close'] > p['BB_lower'] and c['RSI_9'] < 30,
         "short_entry": lambda c, p: p['close'] > p['BB_upper'] and c['close'] < c['BB_upper'] and c['RSI_9'] > 70,
-        # Saída Lógica: Sair quando o preço atinge a média é o objetivo da reversão. Sem alteração.
         "exit": lambda c, p, side: (c['close'] > c['BB_middle']) if side == 'long' else (c['close'] < c['BB_middle'])
     },
     "7. Tendencia Confirmada (1h)": {
-        "description": "Entra em tendências fortes e estabelecidas, aproveitando pullbacks (correções) até a média móvel para comprar.",
+        "description": "Entra em tendências fortes e estabelecidas, aproveitando pullbacks, agora com filtro da EMA 200.",
         "timeframe": "1h",
-        "min_candles": 60,
+        "min_candles": 200, # Aumentado para EMA 200
         "tsl_atr_multiple": 3.0,
-        "long_entry": lambda c, p: c['EMA_9'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and p['low'] <= p['EMA_21'] and c['close'] > c['EMA_21'] and c['ADX'] > 25,
-        "short_entry": lambda c, p: c['EMA_9'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and p['high'] >= p['EMA_21'] and c['close'] < c['EMA_21'] and c['ADX'] > 25,
-        # Saída aprimorada: O sinal de saída é o enfraquecimento da tendência de médio prazo (cruzamento 21/50), não apenas a de curto prazo.
+        "long_entry": lambda c, p: c['close'] > c['EMA_200'] and c['EMA_9'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and p['low'] <= p['EMA_21'] and c['close'] > c['EMA_21'] and c['ADX'] > 25,
+        "short_entry": lambda c, p: c['close'] < c['EMA_200'] and c['EMA_9'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and p['high'] >= p['EMA_21'] and c['close'] < c['EMA_21'] and c['ADX'] > 25,
         "exit": lambda c, p, side: (c['EMA_21'] < c['EMA_50']) if side == 'long' else (c['EMA_21'] > c['EMA_50'])
     },
     "8. Scalper Volume (1m)": {
-        "description": "Estratégia de scalping visando muitas operações, saídas rápidas. Direcional: long ou short.",
+        "description": "Scalping de altíssima frequência. Não utiliza filtro de tendência para maior agilidade.",
         "timeframe": "1m",
         "min_candles": 50,
         "tsl_atr_multiple": 3.5,
         "long_entry": lambda c, p: c['close'] > c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] < 60,
         "short_entry": lambda c, p: c['close'] < c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] > 40,
-        # Saída Lógica: A lógica original já era robusta para scalping (saída rápida por preço ou exaustão). Sem alteração.
         "exit": lambda c, p, side: (c['close'] < c['EMA_9'] or c['STOCH_K'] > 80) if side == 'long' else (c['close'] > c['EMA_9'] or c['STOCH_K'] < 20)
     },
     "9. MACD/RSI Trend Follower (1h)": {
-        "description": "Entrada quando o MACD cruza confirmando força do RSI, filtrado por tendência válida (ADX).",
+        "description": "Segue tendências com confirmação múltipla, agora com o filtro adicional da EMA 200.",
         "timeframe": "1h",
-        "min_candles": 100,  # MACD(26), RSI(14) e ADX(14)
+        "min_candles": 200, # Aumentado para EMA 200
         "tsl_atr_multiple": 2.5,
-        "long_entry": lambda c, p: (p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['RSI_14'] > 52 and c['ADX'] > 20), # confirma tendência
-        "short_entry": lambda c, p: (p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['RSI_14'] < 48 and c['ADX'] > 20),
+        "long_entry": lambda c, p: c['close'] > c['EMA_200'] and (p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['RSI_14'] > 52 and c['ADX'] > 20),
+        "short_entry": lambda c, p: c['close'] < c['EMA_200'] and (p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['RSI_14'] < 48 and c['ADX'] > 20),
         "exit": lambda c, p, side: ((c['MACD'] < c['MACD_signal'] and c['RSI_14'] < 50) if side == 'long' else (c['MACD'] > c['MACD_signal'] and c['RSI_14'] > 50))
     }
 }
 
-
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Calcula todos os indicadores necessários para as estratégias."""
-    # EMAs
+    # ============ MÉDIAS MÓVEIS EXPONENCIAIS ============
     df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
-    df['EMA_20'] = df['close'].ewm(span=20, adjust=False).mean()
     df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
     df['EMA_50'] = df['close'].ewm(span=50, adjust=False).mean()
     df['EMA_200'] = df['close'].ewm(span=200, adjust=False).mean()
+    # Placeholder para EMA de timeframe maior (ex: 4h ou diário)
+    df['EMA_50_htf'] = df['EMA_50'].shift(1)
 
-    # EMA de timeframe maior (ex: 4h/dia) -> mock, precisa calcular externamente
-    df['EMA_50_htf'] = df['EMA_50'].shift(1)  # Placeholder (usar candles de timeframe maior no real)
+    # ============ RSI ============
+    def calc_rsi(series, length=14):
+        delta = series.diff(1)
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(alpha=1/length, min_periods=length).mean()
+        avg_loss = loss.ewm(alpha=1/length, min_periods=length).mean()
+        rs = avg_gain / (avg_loss.replace(0, 1e-10))
+        return 100 - (100 / (1 + rs))
 
-    # RSI (padrão 14 e curto 9)
-    for length in [14, 9]:
-        delta = df['close'].diff(1)
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        avg_gain = gain.ewm(com=length - 1, min_periods=length).mean()
-        avg_loss = loss.ewm(com=length - 1, min_periods=length).mean()
-        rs = avg_gain / avg_loss
-        df[f'RSI_{length}'] = 100 - (100 / (1 + rs))
+    df['RSI_14'] = calc_rsi(df['close'], 14)
+    df['RSI_9'] = calc_rsi(df['close'], 9)
 
-    # OBV
+    # ============ OBV ============
     df['OBV'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
     df['OBV_MA'] = df['OBV'].rolling(window=20).mean()
 
-    # Bandas de Bollinger
-    df['BB_middle'] = df['close'].rolling(window=20).mean()
-    df['BB_std'] = df['close'].rolling(window=20).std()
+    # ============ BANDAS DE BOLLINGER ============
+    period_bb = 20
+    df['BB_middle'] = df['close'].rolling(window=period_bb).mean()
+    df['BB_std'] = df['close'].rolling(window=period_bb).std()
     df['BB_upper'] = df['BB_middle'] + (df['BB_std'] * 2)
     df['BB_lower'] = df['BB_middle'] - (df['BB_std'] * 2)
-    # df['BBW'] = (df['BB_upper'] - df['BB_lower']) / (df['BB_middle'] + 1e-12)
-    # df['BBW_min_120'] = df['BBW'].rolling(window=120).min()
+    df['BBW'] = (df['BB_upper'] - df['BB_lower']) / (df['BB_middle'].replace(0, 1e-10))
+    df['BBW_min_120'] = df['BBW'].rolling(window=120).min()
 
-    # ATR
+    # ============ ATR ============
     high_low = df['high'] - df['low']
-    high_close = np.abs(df['high'] - df['close'].shift())
-    low_close = np.abs(df['low'] - df['close'].shift())
-    ranges = pd.concat([high_low, high_close, low_close], axis=1)
-    true_range = np.max(ranges, axis=1)
-    df['ATR'] = true_range.ewm(alpha=1 / 14, adjust=False).mean()
+    high_close = (df['high'] - df['close'].shift(1)).abs()
+    low_close = (df['low'] - df['close'].shift(1)).abs()
+    true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    df['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean()
+    df['ATR_MA'] = df['ATR'].rolling(window=50).mean()
 
-    # MACD
-    exp1 = df['close'].ewm(span=12, adjust=False).mean()
-    exp2 = df['close'].ewm(span=26, adjust=False).mean()
-    df['MACD'] = exp1 - exp2
+    # ============ MACD ============
+    ema12 = df['close'].ewm(span=12, adjust=False).mean()
+    ema26 = df['close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = ema12 - ema26
     df['MACD_signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
 
-    # ADX
+    # ============ ADX ============
     plus_dm = df['high'].diff()
-    plus_dm[plus_dm < 0] = 0
-    minus_dm = df['low'].diff()
-    minus_dm[minus_dm > 0] = 0
-    tr = pd.concat(
-        [df['high'] - df['low'], abs(df['high'] - df['close'].shift(1)), abs(df['low'] - df['close'].shift(1))],
-        axis=1).max(axis=1)
-    atr_adx = tr.rolling(14).mean()
-    plus_di = 100 * (plus_dm.ewm(alpha=1 / 14).mean() / atr_adx)
-    minus_di = abs(100 * (minus_dm.ewm(alpha=1 / 14).mean() / atr_adx))
-    dx = (abs(plus_di - minus_di) / (plus_di + minus_di)) * 100
-    df['ADX'] = dx.ewm(alpha=1 / 14).mean()
+    minus_dm = -df['low'].diff()
+    plus_dm[(plus_dm < minus_dm) | (plus_dm < 0)] = 0
+    minus_dm[(minus_dm < plus_dm) | (minus_dm < 0)] = 0
 
-    # Estocástico
-    low_14 = df['low'].rolling(14).min()
-    high_14 = df['high'].rolling(14).max()
-    df['STOCH_K'] = 100 * ((df['close'] - low_14) / (high_14 - low_14))
-    df['STOCH_D'] = df['STOCH_K'].rolling(3).mean()
+    tr_components = pd.concat([
+        df['high'] - df['low'],
+        (df['high'] - df['close'].shift(1)).abs(),
+        (df['low'] - df['close'].shift(1)).abs()
+    ], axis=1)
 
-    # VWAP
-    df['VWAP'] = (df['volume'] * (df['high'] + df['low'] + df['close']) / 3).cumsum() / df['volume'].cumsum()
+    tr = tr_components.max(axis=1)
+    atr = tr.rolling(window=14).mean()
+    plus_di = 100 * (plus_dm.ewm(alpha=1/14).mean() / (atr.replace(0, 1e-10)))
+    minus_di = 100 * (minus_dm.ewm(alpha=1/14).mean() / (atr.replace(0, 1e-10)))
+    dx = (abs(plus_di - minus_di) / ((plus_di + minus_di).replace(0, 1e-10))) * 100
+    df['ADX'] = dx.ewm(alpha=1/14).mean()
 
-    # Média de Volume
+    # ============ ESTOCÁSTICO ============
+    low_14 = df['low'].rolling(window=14).min()
+    high_14 = df['high'].rolling(window=14).max()
+    df['STOCH_K'] = 100 * ((df['close'] - low_14) / ((high_14 - low_14).replace(0, 1e-10)))
+    df['STOCH_D'] = df['STOCH_K'].rolling(window=3).mean()
+
+    # ============ VWAP ============
+    typical_price = (df['high'] + df['low'] + df['close']) / 3
+    vwap_num = (typical_price * df['volume']).cumsum()
+    vwap_den = df['volume'].cumsum().replace(0, 1e-10)
+    df['VWAP'] = vwap_num / vwap_den
+
+    # ============ MÉDIA DE VOLUME ============
     df['Volume_MA'] = df['volume'].rolling(window=20).mean()
 
-    return df.dropna().copy()
+    # ============ VALORES ANTERIORES ============
+    prev_cols = [
+        'close', 'high', 'low', 'volume', 'EMA_9', 'EMA_21', 'EMA_50',
+        'RSI_9', 'RSI_14', 'MACD', 'MACD_signal', 'STOCH_K', 'STOCH_D',
+        'VWAP', 'Volume_MA', 'ATR', 'ATR_MA', 'BBW'
+    ]
+    for col in prev_cols:
+        df[f'{col}_prev'] = df[col].shift(1)
+
+    return df
+
+
+def get_btc_trend_filter(data_source_exchanges: list) -> str:
+    btc_data = None
+    used_exchange = None
+    for exchange in data_source_exchanges:
+        try:
+            data = get_historical_klines('BTC/USDT', '1h', limit=200, exchange_name=exchange)
+            if data is not None and not data.empty:
+                btc_data = data
+                used_exchange = exchange
+                break
+        except Exception as e:
+            print(f"[BTC Trend] Falha ao obter dados de {exchange}: {e}")
+            continue
+
+    if btc_data is None or btc_data.empty or 'close' not in btc_data.columns:
+        print("Não foi possível obter dados válidos do BTC. Filtro desativado temporariamente.")
+        return "long_short"
+
+    btc_data['EMA_Short'] = btc_data['close'].ewm(span=9, adjust=False).mean()
+    btc_data['EMA_Long'] = btc_data['close'].ewm(span=21, adjust=False).mean()
+
+    raw_signal = np.where(btc_data['EMA_Short'] > btc_data['EMA_Long'], 1, -1)
+    smooth_signal = pd.Series(raw_signal).rolling(window=3, min_periods=1).mean()
+
+    recent = smooth_signal.iloc[-3:].mean()
+    if recent > 0.2:
+        trend = "long_only"
+    elif recent < -0.2:
+        trend = "short_only"
+    else:
+        trend = "long_short"
+    return trend

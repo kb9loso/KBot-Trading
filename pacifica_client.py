@@ -1,4 +1,4 @@
-# pacifica_client.py
+# KBot-Trading/pacifica_client.py
 import requests
 import json
 from typing import Dict, List, Any, Optional
@@ -8,9 +8,7 @@ import base58
 from decimal import Decimal, ROUND_HALF_UP
 
 from solders.keypair import Keypair
-
-import ccxt
-import pandas as pd
+from exchange_interface import BaseExchangeClient
 
 
 def _sort_json_keys(value):
@@ -46,7 +44,7 @@ def round_to_increment(value: float, increment: float) -> str:
     return "{:f}".format(rounded_value.normalize())
 
 
-class PacificaClient:
+class PacificaClient(BaseExchangeClient):
     BASE_URL = "https://api.pacifica.fi"
     LIMIT_PRICE_SLIPPAGE_PERCENTAGE = 0.001
 
@@ -59,6 +57,31 @@ class PacificaClient:
             print(f"Usando agente de API: {self.agent_public_key}")
         except Exception as e:
             raise ValueError(f"Chave privada do agente inválida. Erro: {e}")
+
+    def _map_position_from_pacifica(self, pacifica_position: Dict) -> Dict:
+        """
+        Padroniza um dicionário de posição da API da Pacifica.
+        Neste caso, os campos já correspondem em grande parte ao padrão.
+        """
+        return {
+            'symbol': pacifica_position.get('symbol'),
+            'side': pacifica_position.get('side'),
+            'amount': float(pacifica_position.get('amount', 0.0)),
+            'entry_price': float(pacifica_position.get('entry_price', 0.0)),
+            'pnl': float(pacifica_position.get('pnl', 0.0)),
+            'leverage': float(pacifica_position.get('leverage', 1.0)),
+            'created_at': int(pacifica_position.get('created_at', 0)),
+        }
+
+    def _map_account_info_from_pacifica(self, pacifica_account_info: Dict) -> Dict:
+        """Converte os campos de string para float para padronização."""
+        if not pacifica_account_info:
+            return None
+        return {
+            'balance': float(pacifica_account_info.get('balance', 0.0)),
+            'account_equity': float(pacifica_account_info.get('account_equity', 0.0)),
+            'available_to_spend': float(pacifica_account_info.get('available_to_spend', 0.0)),
+        }
 
     def _sign_message_and_build_payload(self, signature_header: Dict, signature_payload: Dict) -> Dict:
         message_to_sign_str = json.dumps({**signature_header, "data": signature_payload}, sort_keys=True,
@@ -107,8 +130,10 @@ class PacificaClient:
             'offset': offset
         }
         response_data = self._make_request('GET', path, params=params)
-        if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
-            return response_data['data']
+        if response_data and response_data.get('success'):
+            data = response_data.get('data')
+            if isinstance(data, list):
+                return data
         return []
 
     def create_subaccount(self, new_sub_private_key_b58: str) -> Dict:
@@ -153,10 +178,7 @@ class PacificaClient:
 
     def create_market_order(self, symbol: str, side: str, amount: str, reduce_only: bool = False,
                             slippage: float = 1.0, take_profit_price: str = None,
-                            stop_loss_price: str = None, tick_size: float = 0.01) -> Dict:
-        """
-        Cria uma ordem a mercado. Pode ser usada para abrir (com TP/SL) ou fechar (reduce_only=True) uma posição.
-        """
+                            stop_loss_price: str = None, tick_size: float = 0.01, **kwargs) -> Dict:
         path = '/api/v1/orders/create_market'
         timestamp = int(time.time() * 1000)
         signature_header = {"type": "create_market_order", "timestamp": timestamp, "expiry_window": 30000}
@@ -167,7 +189,6 @@ class PacificaClient:
             "slippage_percent": str(slippage), "reduce_only": reduce_only,
         }
 
-        # Adiciona TP e SL apenas se ambos forem fornecidos (para ordens de abertura)
         if take_profit_price and stop_loss_price:
             sl_price_float = float(stop_loss_price)
             tp_price_float = float(take_profit_price)
@@ -188,11 +209,15 @@ class PacificaClient:
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def get_account_info(self) -> Dict:
+    def get_account_info(self) -> Optional[Dict[str, Any]]:
+        """Busca as informações da conta e as retorna no formato padronizado."""
         path = '/api/v1/account'
         params = {'account': self.main_public_key}
         response = self._make_request('GET', path, params=params)
-        return response.get('data') if response else None
+        if response and isinstance(response.get('data'), dict):
+            return self._map_account_info_from_pacifica(response['data'])
+
+        return None
 
     def get_account_settings(self) -> List[Dict]:
         path = '/api/v1/account/settings'
@@ -204,22 +229,29 @@ class PacificaClient:
         path = '/api/v1/positions'
         params = {'account': self.main_public_key}
         response_data = self._make_request('GET', path, params=params)
-        if response_data and isinstance(response_data.get('data'), list):
-            positions_list = response_data['data']
-            all_open_positions = [pos for pos in positions_list if 'amount' in pos and float(pos['amount']) > 0]
-            if market:
-                market_base_symbol = market.split('/')[0].upper()
-                return [pos for pos in all_open_positions if
-                        'symbol' in pos and pos['symbol'].upper() == market_base_symbol]
-            return all_open_positions
-        return []
 
-    def get_trade_history(self, start_time_ms: int, end_time_ms: int) -> List[Dict]:
-        # This method is slightly modified to handle pagination, similar to the new order history method.
+        if not (response_data and isinstance(response_data.get('data'), list)):
+            return []
+
+        positions_list_raw = response_data['data']
+
+        all_open_positions = [
+            self._map_position_from_pacifica(pos) for pos in positions_list_raw if
+            isinstance(pos, dict) and 'amount' in pos and float(pos.get('amount', 0.0)) > 0
+        ]
+
+        if market:
+            market_base_symbol = market.split('/')[0].upper()
+            return [
+                pos for pos in all_open_positions if 'symbol' in pos and pos['symbol'].upper() == market_base_symbol
+            ]
+
+        return all_open_positions
+
+    def get_trade_history(self, start_time_ms: int, end_time_ms: int, limit: int = 300) -> List[Dict]:
         path = '/api/v1/positions/history'
         all_records = []
         offset = 0
-        limit = 300  # Use a reasonable limit
 
         while True:
             params = {
@@ -235,17 +267,16 @@ class PacificaClient:
                 records = response_data['data']
                 all_records.extend(records)
                 if len(records) < limit:
-                    break  # Exit loop if we received less than the limit, meaning it's the last page
+                    break
                 offset += len(records)
             else:
                 break
         return all_records
 
-    def get_order_history(self) -> List[Dict]:
+    def get_order_history(self, limit: int = 300) -> List[Dict]:
         path = '/api/v1/orders/history'
         all_orders = []
         offset = 0
-        limit = 300
         while True:
             params = {
                 'account': self.main_public_key,
@@ -277,11 +308,23 @@ class PacificaClient:
             print(f"Erro ao buscar informações do mercado: {e}")
             return {}
 
-    def get_current_prices(self) -> List[Dict]:
+    def get_current_prices(self, symbols: List[str] = None) -> List[Dict]:
+        """
+        Busca os preços (tickers). Se uma lista de símbolos for fornecida,
+        filtra o resultado.
+        """
         path = '/api/v1/info/prices'
         response_data = self._make_request('GET', path)
+
         if response_data and isinstance(response_data.get('data'), list):
-            return response_data['data']
+            all_prices = response_data['data']
+            if symbols:
+                symbols_set = {s.upper() for s in symbols}
+                return [
+                    price for price in all_prices
+                    if isinstance(price, dict) and price.get('symbol', '').upper() in symbols_set
+                ]
+            return all_prices
         return []
 
     def get_open_orders(self) -> List[Dict]:
@@ -292,36 +335,37 @@ class PacificaClient:
             return response_data['data']
         return []
 
-    def cancel_order(self, symbol: str, order_id: int) -> Dict:
+    def cancel_order(self, symbol: str, order_id: str) -> Dict:
         path = '/api/v1/orders/cancel'
         timestamp = int(time.time() * 1000)
         signature_header = {"type": "cancel_order", "timestamp": timestamp, "expiry_window": 30000}
-        signature_payload = {"symbol": symbol, "order_id": order_id}
+        signature_payload = {"symbol": symbol, "order_id": int(order_id)}
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def cancel_stop_order(self, symbol: str, order_id: int) -> Dict:
+    def cancel_stop_order(self, symbol: str, order_id: str) -> Dict:
         path = '/api/v1/orders/stop/cancel'
         timestamp = int(time.time() * 1000)
         signature_header = {"type": "cancel_stop_order", "timestamp": timestamp, "expiry_window": 30000}
-        signature_payload = {"symbol": symbol, "order_id": order_id}
+        signature_payload = {"symbol": symbol, "order_id": int(order_id)}
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def set_position_tpsl(self, symbol: str, side: str, tick_size: float, stop_loss_price: str = None,
-                          take_profit_price: str = None) -> Dict:
+    def set_position_tpsl(self, symbol: str, position_side: str, position_size: str, tick_size: float,
+                          stop_loss_price: str = None, take_profit_price: str = None) -> Dict:
         path = '/api/v1/positions/tpsl'
         timestamp = int(time.time() * 1000)
         signature_header = {"type": "set_position_tpsl", "timestamp": timestamp, "expiry_window": 30000}
-        is_position_long = side == "bid"
+        is_position_long = position_side == "bid"
         closing_side = "ask" if is_position_long else "bid"
         signature_payload = {"symbol": symbol, "side": closing_side}
 
+        # O resto da lógica da função permanece igual...
         if stop_loss_price:
             sl_price_float = float(stop_loss_price)
             sl_limit_price = sl_price_float * (
-                        1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_position_long else sl_price_float * (
-                        1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                    1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_position_long else sl_price_float * (
+                    1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
             signature_payload["stop_loss"] = {
                 "stop_price": stop_loss_price,
                 "limit_price": round_to_increment(sl_limit_price, tick_size),
@@ -330,8 +374,8 @@ class PacificaClient:
         if take_profit_price:
             tp_price_float = float(take_profit_price)
             tp_limit_price = tp_price_float * (
-                        1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_position_long else tp_price_float * (
-                        1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                    1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_position_long else tp_price_float * (
+                    1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
             signature_payload["take_profit"] = {
                 "stop_price": take_profit_price,
                 "limit_price": round_to_increment(tp_limit_price, tick_size),
@@ -348,8 +392,8 @@ class PacificaClient:
         is_buy_side = side.upper() == "BUY"
         stop_price_float = float(stop_price)
         limit_price = stop_price_float * (
-                    1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else stop_price_float * (
-                    1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else stop_price_float * (
+                1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
 
         signature_payload = {
             "symbol": symbol, "side": "bid" if is_buy_side else "ask",
@@ -362,11 +406,15 @@ class PacificaClient:
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def get_orderbook(self, symbol: str) -> Dict:
+    def get_orderbook(self, symbol: str, limit: int = 100) -> Optional[Dict]:
         path = '/api/v1/book'
         params = {'symbol': symbol}
         response = self._make_request('GET', path, params=params)
-        return response.get('data') if response and response.get('success') else None
+        if response and response.get('success'):
+            data = response.get('data')
+            if isinstance(data, dict):
+                return data
+        return None
 
     def create_limit_order(self, symbol: str, side: str, amount: str, price: str,
                            reduce_only: bool = False,
@@ -385,8 +433,8 @@ class PacificaClient:
         if take_profit_price:
             tp_price_float = float(take_profit_price)
             tp_limit_price = tp_price_float * (
-                        1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else tp_price_float * (
-                        1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                    1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else tp_price_float * (
+                    1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
             signature_payload["take_profit"] = {
                 "stop_price": take_profit_price,
                 "limit_price": round_to_increment(tp_limit_price, tick_size)
@@ -394,8 +442,8 @@ class PacificaClient:
         if stop_loss_price:
             sl_price_float = float(stop_loss_price)
             sl_limit_price = sl_price_float * (
-                        1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else sl_price_float * (
-                        1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
+                    1 - self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE) if is_buy_side else sl_price_float * (
+                    1 + self.LIMIT_PRICE_SLIPPAGE_PERCENTAGE)
             signature_payload["stop_loss"] = {
                 "stop_price": stop_loss_price,
                 "limit_price": round_to_increment(sl_limit_price, tick_size)
@@ -403,39 +451,6 @@ class PacificaClient:
         final_payload = self._sign_message_and_build_payload(signature_header, signature_payload)
         return self._make_request('POST', path, data=final_payload)
 
-    def get_historical_klines(self, market: str, timeframe: str, limit: int = 200,
-                              exchange_name: str = 'binance') -> Any:
-        try:
-            # Configurações específicas por exchange
-            if exchange_name.lower() == 'binance':
-                exchange = ccxt.binance({
-                    'options': {'defaultType': 'future'},  # mercado de futuros (perp)
-                })
-            elif exchange_name.lower() == 'bybit':
-                exchange = ccxt.bybit({
-                    'options': {'defaultType': 'linear'},  # contratos perp USDT
-                })
-            else:
-                exchange = getattr(ccxt, exchange_name.lower())()
-
-            # Carrega os mercados (necessário para alguns métodos da Bybit)
-            exchange.load_markets()
-
-            # Busca os candles
-            klines = exchange.fetch_ohlcv(market, timeframe, limit=limit)
-
-            # Valida se retornou dados
-            if not klines:
-                return None
-
-            # Converte para DataFrame
-            df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('timestamp', inplace=True)
-            df = df.astype(float)
-
-            return df
-
-        except Exception as e:
-            print(f"Erro ao buscar dados de {exchange_name}: {e}")
-            return None
+    def get_pnl_history(self, start_time_ms: int, end_time_ms: int, limit: int = 100) -> List[Dict[str, Any]]:
+        """A Pacifica não possui um endpoint dedicado para PNL histórico. Retorna uma lista vazia."""
+        return []

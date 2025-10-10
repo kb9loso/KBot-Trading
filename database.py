@@ -7,7 +7,7 @@ DATABASE_FILE = 'trading_history.db'
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE_FILE)
+    conn = sqlite3.connect(DATABASE_FILE, timeout=10)
     return conn
 
 
@@ -83,6 +83,30 @@ def init_db():
                 created_at TEXT,
                 cause TEXT,
                 alert_sent INTEGER DEFAULT 0
+            );
+        ''')
+    cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pnl_history_apex (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_name TEXT NOT NULL,
+                symbol TEXT,
+                size REAL,
+                exitPrice REAL,
+                price REAL,
+                side TEXT,
+                totalPnl REAL,
+                createdAt TEXT,
+                type TEXT,
+                isLiquidate BOOLEAN,
+                isDeleverage BOOLEAN,
+                fee REAL,
+                closeSharedOpenFee REAL,
+                liquidateFee REAL,
+                exitType TEXT,
+                closeSharedFundingFee REAL,
+                closeSharedOpenValue REAL,
+                alert_sent INTEGER DEFAULT 0,
+                UNIQUE(account_name, symbol, createdAt)
             );
         ''')
     conn.commit()
@@ -198,3 +222,46 @@ def insert_successful_order(order_details: dict):
     except Exception as e:
         print(f"ERRO inesperado ao inserir ordem no DB: {e}")
 
+
+def sync_pnl_history(client, account_name: str, start_time_ms: int):
+    """Busca o histórico de PNL da Apex e insere na tabela pnl_history_apex."""
+    print(f"Iniciando sincronização de PNL HISTÓRICO para a conta {account_name}...")
+    end_time_ms = int(datetime.now().timestamp() * 1000)
+    pnl_history = client.get_pnl_history(start_time_ms, end_time_ms)
+
+    if not pnl_history:
+        print(f"Nenhum novo registro de PNL encontrado para a conta {account_name}.")
+        return
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    new_records_count = 0
+    for record in pnl_history:
+        created_at_str = _ms_to_utc_string(record.get('createdAt'))
+
+        # --- INÍCIO DA CORREÇÃO ---
+        # Adiciona o campo 'alert_sent' na inserção
+        cursor.execute('''
+            INSERT OR IGNORE INTO pnl_history_apex 
+            (account_name, symbol, size, exitPrice, price, side, totalPnl, createdAt, type, isLiquidate, 
+            isDeleverage, fee, closeSharedOpenFee, liquidateFee, exitType, closeSharedFundingFee, closeSharedOpenValue, alert_sent) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            account_name, record.get('symbol'), float(record.get('size') or 0.0),
+            float(record.get('exitPrice') or 0.0), float(record.get('price') or 0.0),
+            record.get('side'), float(record.get('totalPnl') or 0.0), created_at_str,
+            record.get('type'), record.get('isLiquidate'), record.get('isDeleverage'),
+            float(record.get('fee') or 0.0), float(record.get('closeSharedOpenFee') or 0.0),
+            float(record.get('liquidateFee') or 0.0), record.get('exitType'),
+            float(record.get('closeSharedFundingFee') or 0.0),
+            float(record.get('closeSharedOpenValue') or 0.0),
+            0  # Valor padrão para alert_sent
+        ))
+        # --- FIM DA CORREÇÃO ---
+        if cursor.rowcount > 0:
+            new_records_count += 1
+
+    conn.commit()
+    conn.close()
+    if new_records_count > 0:
+        print(f"Sincronização de {new_records_count} novos registros de PNL para a conta {account_name} concluída.")

@@ -5,63 +5,22 @@ import ccxt
 import warnings
 from datetime import datetime, timedelta
 
-# Importa a lógica de indicadores e estratégias do arquivo central
 from strategies import STRATEGIES, add_all_indicators
+from data_fetcher import get_historical_klines
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 # ==============================================================================
 # ===================== PAINEL DE OTIMIZAÇÃO E CONTROLE ========================
 # ==============================================================================
-
-# Parâmetros padrão para a otimização
 INITIAL_CAPITAL = 100.0
 RISK_PER_TRADE_PCT = 0.01
-STOP_LOSS_LEVELS_PCT = [0.015, 0.02, 0.025, 0.03, 0.04, 0.05]
-TAKE_PROFIT_RRRS = [2.0, 2.5, 3.0, 4.0]
-
-
+STOP_LOSS_LEVELS_PCT = [0.015, 0.02, 0.025, 0.03]
+TAKE_PROFIT_RRRS = [2.0, 2.5, 3.0]
 # ==============================================================================
 # ======================== FIM DO PAINEL DE CONTROLE ===========================
 # ==============================================================================
 
-
-def get_exchange_data(exchange_id, symbol, timeframe, since_timestamp):
-    """Busca dados históricos de uma exchange usando ccxt a partir de um timestamp."""
-    try:
-        if exchange_id.lower() == 'binance':
-            exchange = ccxt.binance({
-                'options': {'defaultType': 'future'},
-            })
-        elif exchange_id.lower() == 'bybit':
-            exchange = ccxt.bybit({
-                'options': {'defaultType': 'linear'},
-            })
-        else:
-            exchange = getattr(ccxt, exchange_id.lower())()
-        if not exchange.has['fetchOHLCV']: return None
-
-        all_klines = []
-        while True:
-            klines = exchange.fetch_ohlcv(symbol, timeframe, since=since_timestamp, limit=1000)
-            if not klines: break
-            all_klines.extend(klines)
-            since_timestamp = klines[-1][0] + 1
-
-        df = pd.DataFrame(all_klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df.set_index('timestamp', inplace=True)
-        for col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce')
-        df.dropna(inplace=True)
-        return df
-    except Exception as e:
-        print(f"Erro ao buscar dados: {e}")
-        return None
-
-
-# ==============================================================================
-# ===================== FUNÇÃO run_backtest ATUALIZADA =========================
-# ==============================================================================
 
 def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_trade):
     """Executa o backtest APENAS com Stop Loss e Take Profit."""
@@ -83,12 +42,10 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_
         current_row = df.iloc[i]
         prev_row = df.iloc[i - 1]
 
-        # --- LÓGICA DE GESTÃO DE POSIÇÃO ABERTA (APENAS SL/TP) ---
         if position_type != 0:
             exit_price, result = None, None
             side = 'long' if position_type == 1 else 'short'
 
-            # Verifica apenas as condições de Stop Loss e Take Profit
             if side == 'long':
                 if current_row['low'] <= stop_loss_price:
                     exit_price, result = stop_loss_price, 'loss'
@@ -100,20 +57,14 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_
                 elif current_row['low'] <= take_profit_price:
                     exit_price, result = take_profit_price, 'win'
 
-            # Se uma condição de saída foi atingida, fecha a operação
             if exit_price is not None:
-                pnl = (exit_price - entry_price) * position_size if position_type == 1 else (
-                                                                                                        entry_price - exit_price) * position_size
+                pnl = (exit_price - entry_price) * position_size if position_type == 1 else (entry_price - exit_price) * position_size
                 capital += pnl
                 trades.append({'entry_date': entry_date, 'exit_date': current_row.name, 'entry_price': entry_price,
                                'exit_price': exit_price, 'result': result, 'pnl': pnl, 'type': side})
-
                 position_type = 0
+                if capital <= 0: break
 
-                if capital <= 0:
-                    break
-
-        # --- LÓGICA DE ENTRADA DE POSIÇÃO ---
         if position_type == 0 and capital > 0:
             open_pos = False
             if strategy.get('long_entry') and strategy['long_entry'](current_row, prev_row):
@@ -126,12 +77,8 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_
             if open_pos:
                 entry_price = current_row['close']
                 sl_distance_in_price = entry_price * sl_pct
-
                 amount_to_risk = capital * risk_per_trade
-                if sl_distance_in_price > 0:
-                    position_size = amount_to_risk / sl_distance_in_price
-                else:
-                    position_size = 0
+                position_size = amount_to_risk / sl_distance_in_price if sl_distance_in_price > 0 else 0
 
                 if position_type == 1:
                     stop_loss_price = entry_price - sl_distance_in_price
@@ -139,14 +86,11 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_
                 else:
                     stop_loss_price = entry_price + sl_distance_in_price
                     take_profit_price = entry_price - (sl_distance_in_price * rrr)
-
                 entry_date = current_row.name
 
-    # --- LÓGICA DE FECHAMENTO AO FINAL DOS DADOS ---
     if position_type != 0:
         final_price = df.iloc[-1]['close']
-        pnl = (final_price - entry_price) * position_size if position_type == 1 else (
-                                                                                                 entry_price - final_price) * position_size
+        pnl = (final_price - entry_price) * position_size if position_type == 1 else (entry_price - final_price) * position_size
         capital += pnl
         side = 'long' if position_type == 1 else 'short'
         trades.append({
@@ -160,11 +104,6 @@ def run_backtest(df, initial_capital, rrr, sl_pct, leverage, strategy, risk_per_
         })
 
     return capital, pd.DataFrame(trades)
-
-
-# ==============================================================================
-# ======================== FIM DA FUNÇÃO ATUALIZADA ============================
-# ==============================================================================
 
 
 def analyze_performance(initial_capital, final_capital, trades_df):
@@ -242,7 +181,7 @@ def run_full_backtest(symbol, leverage):
             start_timestamp_ms = now_ms - (total_candles_to_fetch * tf_seconds * 1000)
             price_data = None
             for exchange_name in exchange_priority_list:
-                data = get_exchange_data(exchange_name, symbol, tf, start_timestamp_ms)
+                data = get_historical_klines(symbol, tf, start_timestamp_ms=start_timestamp_ms, exchange_name=exchange_name)
                 if data is not None and not data.empty:
                     price_data = data
                     print(f"Dados para {tf} obtidos com sucesso de '{exchange_name}'.")
@@ -265,14 +204,19 @@ def run_full_backtest(symbol, leverage):
         current_tf = logic['timeframe']
         if current_tf not in data_with_indicators: continue
 
-        df_for_backtest = data_with_indicators[current_tf]
+        # --- INÍCIO DA CORREÇÃO ---
+        # Armazena o DataFrame original para este timeframe
+        original_df = data_with_indicators[current_tf]
+        # --- FIM DA CORREÇÃO ---
 
         best_strategy_run = None
         best_strategy_return = -float('inf')
 
         for sl_pct in STOP_LOSS_LEVELS_PCT:
             for rrr in TAKE_PROFIT_RRRS:
-                final_capital, trades_df = run_backtest(df_for_backtest.copy(), INITIAL_CAPITAL, rrr, sl_pct, leverage,
+                # --- CORREÇÃO APLICADA AQUI ---
+                # Passa uma cópia profunda (deep copy) do DataFrame para cada execução do backtest
+                final_capital, trades_df = run_backtest(original_df.copy(deep=True), INITIAL_CAPITAL, rrr, sl_pct, leverage,
                                                         logic, RISK_PER_TRADE_PCT)
                 perf = analyze_performance(INITIAL_CAPITAL, final_capital, trades_df)
 

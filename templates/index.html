@@ -14,30 +14,13 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .logo { height: 32px; width: auto; }
         h1 { font-size: 24px; color: #ffffff; margin: 0; text-align: center; flex-grow: 1; font-weight: 600; }
-        .header-right-side {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .version-info {
-            font-size: 11px;
-            text-align: right;
-            color: #a0a0a0;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
-        }
+        .header-right-side { display: flex; align-items: center; gap: 20px; }
+        .version-info { font-size: 11px; text-align: right; color: #a0a0a0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         .version-text { font-family: "SF Mono", monospace; }
         .update-link { text-decoration: none; }
         .status-text.warning { color: #ffab40; }
         .status-text .fas { margin-right: 4px; }
-        .docs-link {
-            color: #87CEFA; /* Light Sky Blue */
-            font-weight: 600;
-            font-size: 12px;
-        }
+        .docs-link { color: #87CEFA; font-weight: 600; font-size: 12px; }
         .docs-link:hover { text-decoration: underline; }
         h2 { font-size: 15px; color: #f5f5f5; border-bottom: 2px solid #444; padding-bottom: 8px; margin-top: 25px; font-weight: 500; }
         .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #444; padding-bottom: 8px; }
@@ -47,17 +30,12 @@
         .status-text.negative { color: #dc3545; }
         .info-section, .form-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
         .info-section h2:not(.section-header h2), .form-section h2 { margin-top: 0; margin-bottom: 10px; }
-
-        /* --- Donate Section --- */
         .donate-section { text-align: center; font-size: 12px; }
         .donate-section strong { color: #ffffff; font-weight: 600; display: block; margin-bottom: 5px; }
         .donate-address { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 4px; }
         .donate-address span { color: #a0a0a0; font-family: "SF Mono", monospace; font-size: 11px; }
         .copy-icon { cursor: pointer; color: #007bff; }
         .copy-icon:hover { color: #0056b3; }
-
-
-        /* --- Card Styles --- */
         .account-info, .dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
         .metric-card { background: #363636; padding: 15px; border-radius: 5px; border: 1px solid #444; display: flex; align-items: center; gap: 15px; position: relative; }
         .metric-icon { font-size: 1.7em; color: #8a939e; flex-shrink: 0; width: 35px; text-align: center; }
@@ -68,14 +46,12 @@
         .metric-text span.negative { color: #dc3545; }
         .toggle-indicator { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #8a939e; transition: transform 0.3s ease; }
         .toggle-indicator.open { transform: translateY(-50%) rotate(180deg); }
-
-        /* --- Log Styles --- */
         .logs-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
         .logs-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;}
         .logs-header h2 { margin: 0; padding: 0; font-size: 1rem; border-bottom: none}
         .log-filters { display: flex; gap: 10px; margin: 0; padding: 0; margin-left: auto; align-items: center; }
         .logs { background: #1e1e2f; color: #c8c8c8; border: 1px solid #333; height: 250px; overflow-y: auto; padding: 8px; font-family: "SF Mono", monospace; font-size: 0.85em; border-radius: 5px; text-align: left; width: 100%; box-sizing: border-box; }
-        .log-entry { display: block; padding: 0; margin: 0; line-height: 1; word-break: break-word; text-align: left; }
+        .log-entry { display: block; padding: 0; margin: 0; line-height: 1.5; word-break: break-word; text-align: left; }
         .log-entry.INFO { color: #c8c8c8; }
         .log-entry.WARNING { color: #ffab40; background-color: rgba(255, 171, 64, 0.06); }
         .log-entry.ERROR { color: #ff5252; background-color: rgba(255, 82, 82, 0.06); }
@@ -83,57 +59,39 @@
         .logs::-webkit-scrollbar { width: 8px; }
         .logs::-webkit-scrollbar-track { background: #2a2a3f; border-radius: 5px; }
         .logs::-webkit-scrollbar-thumb { background-color: #555; border-radius: 5px; border: 2px solid #2a2a3f; }
-
-
-        /* --- Form & Table Styles --- */
         .form-section form { display: flex; flex-direction: column; gap: 15px; }
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
         button { padding: 8px 16px; border: none; color: white; border-radius: 5px; cursor: pointer; font-size: 1em; font-family: 'Montserrat', sans-serif; font-weight: 500;}
         .delete-btn { background-color: transparent; color: #FF6D00; padding: 4px 8px; font-size: 1.1em; }
         .edit-btn { background-color: transparent; color: #17a2b8; padding: 4px 8px; font-size: 1.1em; margin-right: 5px; border: none; cursor: pointer; }
         .start-btn { background-color: #28a745; }
+        .add-btn { background-color: #0d6efd; }
         .stop-btn { background-color: #dc3545; }
         .refresh-btn { background-color: #6c757d; }
-        .add-btn { background-color: #007bff; }
         .notification-btn { background-color: #6f42c1; }
         input, select { padding: 8px; border: 1px solid #555; border-radius: 5px; font-size: 1em; background-color: #333; color: #e0e0e0; font-family: 'Montserrat', sans-serif; }
         .form-section label { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; font-weight: 500; color: #c0c0c0; }
         .form-section .value-input { width: 90px; }
-
         .table-container { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         table .start-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #28a745; }
         table .stop-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #dc3545; }
-        table .start-btn:hover { color: #3dd561; }
-        table .stop-btn:hover { color: #ff6b81; }
-        .notification-toggle-btn {
-            background-color: transparent;
-            font-size: 1.1em;
-            padding: 4px 8px;
-            border: none;
-            cursor: pointer;
-        }
+        .notification-toggle-btn { background-color: transparent; font-size: 1.1em; padding: 4px 8px; border: none; cursor: pointer; }
         .notification-toggle-btn .fa-bell { color: #28a745; }
         .notification-toggle-btn .fa-bell-slash { color: #6c757d; }
-        .notification-toggle-btn:disabled .fa-bell-slash { color: #495057; cursor: not-allowed; }
-
-
         th, td { padding: 8px 12px; border: 1px solid #444; text-align: left; vertical-align: middle; font-size: 13px;}
         th { background-color: #343a40; font-weight: 600; }
         tr:nth-child(even) { background-color: #2c2f33; }
         .status-icon { font-size: 0.8em; margin-right: 8px; }
         .status-icon.open { color: #28a745; }
         .status-icon.idle { color: #ffc107; }
-        .clickable-card {cursor: pointer; transition: background-color 0.2s ease-in-out;}
-        .clickable-card:hover {background-color: #495057;}
+        .clickable-card {cursor: pointer;}
         .positive-pnl { color: #28a745; }
         .negative-pnl { color: #dc3545; }
         .action-column { width: 1%; white-space: nowrap; }
         .action-buttons-container { display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; }
         .asset-cell-container { display: flex; align-items: center; }
         .header-actions { display: flex; gap: 10px; flex-wrap: wrap;}
-
-        /* --- Backtest Result Styles --- */
         .backtest-result { margin-top: 20px; padding: 12px; background-color: #2a2a2e; border: 1px solid #444; border-radius: 5px; color: #e0e0e0; font-size: 0.9em; }
         .backtest-result .result-header { display: flex; align-items: center; gap: 8px; font-size: 1em; font-weight: 600; color: #ffffff; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #444; }
         .backtest-result .result-body p { margin: 4px 0; font-size: 0.9em; }
@@ -142,7 +100,6 @@
         .backtest-result .metric .value { font-size: 1.2em; font-weight: 700; }
         .backtest-result .metric .value.positive { color: #28a745; }
         .backtest-result .metric .value.negative { color: #dc3545; }
-
         .directional-results-table table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: center; }
         .directional-results-table th, .directional-results-table td { padding: 6px; border: 1px solid #444; }
         .directional-results-table th { background-color: #363636; font-size: 0.8em; text-transform: uppercase; color: #c0c0c0; }
@@ -211,7 +168,15 @@
                         <tr>
                             <td>{{ account.account_name }}</td>
                             <td>{{ account.exchange_name | capitalize }}</td>
-                            <td>{{ account.main_public_key[:6] }}...{{ account.main_public_key[-4:] }}</td>
+                            <td>
+                                {% if account.exchange_name == 'pacifica' and account.main_public_key %}
+                                    {{ account.main_public_key[:6] }}...{{ account.main_public_key[-4:] }}
+                                {% elif account.exchange_name == 'apex' and account.zk_l2key %}
+                                    {{ account.zk_l2key[:6] }}...{{ account.zk_l2key[-4:] }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
                             <td>{{ account.check_interval_seconds }}s</td>
                             <td><span class="status-text {{ 'positive' if account.account_name in running_bots else 'negative' }}">{{ 'Executando' if account.account_name in running_bots else 'Parado' }}</span></td>
                             <td class="action-column">
@@ -246,7 +211,7 @@
                 <div class="form-row">
                     <label title="Um nome único para identificar esta conta no painel.">Nome da Conta<input type="text" name="account_name" required></label>
                     <label title="A corretora onde esta conta será usada.">Exchange
-                        <select name="exchange_name" required onchange="validateAccountForm()">
+                        <select name="exchange_name" required onchange="toggleCredentialFields(this.value)">
                             {% for ex_name in exchanges_allowed %}
                             <option value="{{ ex_name }}">{{ ex_name | capitalize }}</option>
                             {% endfor %}
@@ -254,8 +219,17 @@
                     </label>
                     <label title="O intervalo em segundos que o bot aguardará entre cada verificação de sinais de trading.">Intervalo (s)<input type="number" name="check_interval" value="180" class="value-input" required></label>
                 </div>
-                <div class="form-row"><label title="A chave de API pública da sua conta na exchange." style="flex-grow: 1;">Chave Pública<input type="text" name="main_public_key" required></label></div>
-                <div class="form-row"><label title="A chave de API privada (secret key) da sua conta na exchange." style="flex-grow: 1;">Chave Privada do Agente<input type="password" name="agent_private_key" required></label></div>
+                <div id="pacifica-fields" class="credential-fields">
+                    <div class="form-row"><label title="A chave de API pública da sua conta na exchange." style="flex-grow: 1;">Chave Pública<input type="text" name="main_public_key" class="pacifica-required"></label></div>
+                    <div class="form-row"><label title="A chave de API privada (secret key) da sua conta na exchange." style="flex-grow: 1;">Chave Privada do Agente<input type="password" name="agent_private_key" class="pacifica-required"></label></div>
+                </div>
+                <div id="apex-fields" class="credential-fields" style="display: none;">
+                    <div class="form-row"><label title="Sua API Key da Apex." style="flex-grow: 1;">API Key<input type="text" name="api_key" class="apex-required"></label></div>
+                    <div class="form-row"><label title="Seu API Secret da Apex." style="flex-grow: 1;">API Secret<input type="password" name="api_secret" class="apex-required"></label></div>
+                    <div class="form-row"><label title="Sua API Passphrase da Apex." style="flex-grow: 1;">API Passphrase<input type="password" name="passphrase" class="apex-required"></label></div>
+                    <div class="form-row"><label title="Sua ZK Seed da Apex." style="flex-grow: 1;">ZK Seeds<input type="password" name="zk_seeds" class="apex-required"></label></div>
+                    <div class="form-row"><label title="Sua ZK L2 Key da Apex." style="flex-grow: 1;">ZK L2 Key<input type="password" name="zk_l2key" class="apex-required"></label></div>
+                </div>
                 <div class="form-row">
                     <button type="submit" class="add-btn">Salvar Conta</button>
                     <button type="button" class="stop-btn" onclick="toggleAddAccountForm()">Cancelar</button>
@@ -267,24 +241,12 @@
             <h2>Gerenciar Notificações do Telegram</h2>
             <form action="/save_telegram_settings" method="post">
                 <div class="form-row">
-                    <label title="Token do seu bot do Telegram, obtido com o @BotFather.">
-                        Token do Bot
-                        <input type="text" name="telegram_bot_token" value="{{ telegram_config.bot_token or '' }}">
-                    </label>
-                    <label title="ID do chat para onde as notificações serão enviadas.">
-                        Chat ID
-                        <input type="text" name="telegram_chat_id" value="{{ telegram_config.chat_id or '' }}">
-                    </label>
+                    <label title="Token do seu bot do Telegram, obtido com o @BotFather.">Token do Bot<input type="text" name="telegram_bot_token" value="{{ telegram_config.bot_token or '' }}"></label>
+                    <label title="ID do chat para onde as notificações serão enviadas.">Chat ID<input type="text" name="telegram_chat_id" value="{{ telegram_config.chat_id or '' }}"></label>
                 </div>
                 <div class="form-row">
-                    <label title="Notificar no Telegram quando uma posição for aberta." style="flex-direction: row; align-items: center; gap: 8px;">
-                        <input type="checkbox" name="notify_on_open" value="true" {{ 'checked' if telegram_config.get('notify_on_open') }}>
-                        Notificar Abertura
-                    </label>
-                    <label title="Notificar no Telegram quando uma posição for fechada." style="flex-direction: row; align-items: center; gap: 8px;">
-                        <input type="checkbox" name="notify_on_close" value="true" {{ 'checked' if telegram_config.get('notify_on_close') }}>
-                        Notificar Fechamento
-                    </label>
+                    <label title="Notificar no Telegram quando uma posição for aberta." style="flex-direction: row; align-items: center; gap: 8px;"><input type="checkbox" name="notify_on_open" value="true" {{ 'checked' if telegram_config.get('notify_on_open') }}>Notificar Abertura</label>
+                    <label title="Notificar no Telegram quando uma posição for fechada." style="flex-direction: row; align-items: center; gap: 8px;"><input type="checkbox" name="notify_on_close" value="true" {{ 'checked' if telegram_config.get('notify_on_close') }}>Notificar Fechamento</label>
                 </div>
                 <div class="form-row">
                     <button type="submit" class="add-btn">Salvar Configurações</button>
@@ -293,13 +255,33 @@
             </form>
         </div>
 
-
-        {% if displayed_account %}
+        {% if accounts %}
             <div class="info-section">
-                <h2>Conta: {{ displayed_account.account_name }}</h2>
-                <div class="account-info">
-                    {% if account_info %}
-                        <div class="metric-card"><i class="fas fa-exchange-alt metric-icon"></i><div class="metric-text"><strong>MOVIMENTAÇÕES</strong><span>${{ "%.2f"|format(movements|float) }}</span></div></div>
+                <div class="section-header">
+                    <h2>Visão Geral</h2>
+                    <form id="account-filter-form" action="{{ url_for('index') }}" method="get" style="margin-left: auto;">
+                        <label style="flex-direction: row; align-items: center; gap: 8px; font-weight: normal;">
+                            Exibir dados para:
+                            <select name="account" onchange="this.form.submit()">
+                                <option value="all" {% if selected_account_filter == 'all' %}selected{% endif %}>Todas as Contas</option>
+                                {% for acc in accounts %}
+                                    <option value="{{ acc.account_name }}" {% if selected_account_filter == acc.account_name %}selected{% endif %}>
+                                        {{ acc.account_name }} ({{ acc.exchange_name | capitalize }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </form>
+                </div>
+
+                <div class="account-info" style="margin-top: 15px;">
+                    {% if account_info and account_info.account_equity is defined %}
+                        {% if volume_7d is defined and volume_7d > 0 %}
+                        <div class="metric-card">
+                            <i class="fas fa-sync-alt metric-icon"></i> <div class="metric-text">
+                                <strong>VOLUME (7D)</strong> <span>${{ "%.2f"|format(volume_7d|float) }}</span> </div>
+                        </div>
+                        {% endif %}
                         <div class="metric-card"><i class="fas fa-chart-line metric-icon"></i><div class="metric-text"><strong>PATRIMÔNIO</strong><span>${{ "%.2f"|format(account_info.account_equity|float) }}</span></div></div>
                         <div class="metric-card clickable-card" onclick="togglePositionsTable()">
                             <i class="fas fa-box-open metric-icon"></i>
@@ -308,7 +290,7 @@
                         </div>
                         <div class="metric-card"><i class="fas fa-hand-holding-usd metric-icon"></i><div class="metric-text"><strong>DISPONÍVEL</strong><span>${{ "%.2f"|format(account_info.available_to_spend|float) }}</span></div></div>
                     {% else %}
-                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Clique em "Atualizar Dados" para carregar.</div>
+                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Clique em "Atualizar Dados" para carregar as informações.</div>
                     {% endif %}
                 </div>
             </div>
@@ -366,7 +348,12 @@
                                 <td>{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>
                                 <td>{{ "%.2f"|format(market.stop_loss_config.value * 100) ~ '%' if market.stop_loss_config.type == 'percentage' else market.stop_loss_config.value ~ 'x ATR' }}</td>
                                 <td>{{ market.take_profit_rrr }}:1 RRR</td><td>{{ market.exit_mode | capitalize }}</td>
-                                <td>{{ 'Long & Short' if market.direction_mode == 'long_short' else 'Long Only' if market.direction_mode == 'long_only' else 'Short Only' }}</td>
+                                <td>
+                                    {{ 'Long & Short' if market.direction_mode == 'long_short'
+                                    else 'Long Only' if market.direction_mode == 'long_only'
+                                    else 'Short Only' if market.direction_mode == 'short_only'
+                                    else 'BTC Trend' }}
+                                </td>
                                 <td>
                                     {% set tsl = market.trailing_stop_config %}
                                     {% if tsl and tsl.type != 'none' %}
@@ -400,7 +387,12 @@
                         <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL).">Ativo<input type="text" name="base_currency" required style="width: 100px;"></label>
                         <label title="Percentual do capital total da conta a ser arriscado em cada trade.">Risco (%)<input type="number" name="risk" value="1.0" step="0.1" required class="value-input"></label>
                         <label title="Fator de multiplicação da sua posição (ex: 10x, 20x).">Alavancagem<input type="number" name="leverage" value="10" step="1" required class="value-input"></label>
-                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas.">Direção<select name="direction_mode" style="width: 150px;"><option value="long_short">Long & Short</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option></select></label>
+                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas.">Direção<select name="direction_mode" style="width: 150px;">
+                            <option value="long_short">Long & Short</option>
+                            <option value="long_only">Long Only</option>
+                            <option value="short_only">Short Only</option>
+                            <option value="btc_trend">BTC Trend</option>
+                        </select></label>
                     </div>
                     <div class="form-row">
                         <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações.">Estratégia<select name="strategy_name" style="width: 280px;">{% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}</select></label>
@@ -488,6 +480,7 @@
             </div>
         </div>
     </div>
+
     <script>
         const exchangesData = {{ exchanges_data | tojson | safe }};
 
@@ -503,7 +496,6 @@
             const form = document.getElementById('account-form');
             const exchangeName = form.querySelector('[name="exchange_name"]').value;
             const originalAccountName = form.querySelector('[name="original_account_name"]').value;
-
             const exchange = exchangesData[exchangeName];
             if (exchange && !exchange.multi_account_allowed && exchange.accounts && exchange.accounts.length > 0) {
                 if (!originalAccountName || (exchange.accounts[0] && exchange.accounts[0].account_name !== originalAccountName)) {
@@ -536,23 +528,16 @@
             form.querySelector('[name="base_currency"]').value = setupData.base_currency;
             form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
             form.querySelector('[name="leverage"]').value = setupData.leverage;
-            form.querySelector('[name="direction_mode"]').value = setupData.direction_mode;
+            form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
             form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
             form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
             const slValueInput = form.querySelector('[name="sl_value"]');
-            slValueInput.value = (setupData.stop_loss_config.type === 'percentage')
-                ? setupData.stop_loss_config.value * 100
-                : setupData.stop_loss_config.value;
-
+            slValueInput.value = (setupData.stop_loss_config.type === 'percentage') ? setupData.stop_loss_config.value * 100 : setupData.stop_loss_config.value;
             const exitModeSelect = form.querySelector('[name="exit_mode"]');
             exitModeSelect.value = setupData.exit_mode;
-
-            // Garante que a seção principal do TSL seja exibida ou ocultada corretamente
             toggleTslSection(setupData.exit_mode);
-
             const tslConfig = setupData.trailing_stop_config;
             const tslTypeSelect = form.querySelector('[name="tsl_type"]');
-
             if (tslConfig && tslConfig.type !== 'none') {
                 tslTypeSelect.value = tslConfig.type;
                 if (tslConfig.type === 'breakeven') {
@@ -562,10 +547,7 @@
             } else {
                 tslTypeSelect.value = 'none';
             }
-
-            // Garante que as opções específicas (como o RRR) sejam exibidas ou ocultadas
             toggleTslOptions(tslTypeSelect.value);
-
             form.scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -573,7 +555,6 @@
             const section = document.getElementById('positions-section');
             const icon = document.getElementById('positions-toggle-icon');
             const isOpen = section.style.display === 'block';
-
             if (isOpen) {
                 section.style.display = 'none';
                 icon.classList.remove('open');
@@ -602,7 +583,6 @@
             }
         }
 
-
         function resetAccountForm() {
             const form = document.getElementById('account-form');
             form.reset();
@@ -610,19 +590,51 @@
             document.getElementById('original_account_name').value = '';
         }
 
+        function toggleCredentialFields(exchangeName) {
+            const pacificaFields = document.getElementById('pacifica-fields');
+            const apexFields = document.getElementById('apex-fields');
+            const pacificaInputs = document.querySelectorAll('.pacifica-required');
+            const apexInputs = document.querySelectorAll('.apex-required');
+            if (exchangeName === 'pacifica') {
+                pacificaFields.style.display = 'block';
+                apexFields.style.display = 'none';
+                pacificaInputs.forEach(input => input.required = true);
+                apexInputs.forEach(input => input.required = false);
+            } else if (exchangeName === 'apex') {
+                pacificaFields.style.display = 'none';
+                apexFields.style.display = 'block';
+                pacificaInputs.forEach(input => input.required = false);
+                apexInputs.forEach(input => input.required = true);
+            }
+        }
+
         function editAccount(accountData) {
             const form = document.getElementById('account-form');
+            const exchangeSelect = form.querySelector('[name="exchange_name"]');
             document.getElementById('account-form-title').innerText = 'Editar Conta: ' + accountData.account_name;
             form.querySelector('[name="original_account_name"]').value = accountData.account_name;
             form.querySelector('[name="account_name"]').value = accountData.account_name;
-            form.querySelector('[name="exchange_name"]').value = accountData.exchange_name;
-            form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
-            form.querySelector('[name="agent_private_key"]').value = ''; // Clear private key for security
+            exchangeSelect.value = accountData.exchange_name;
             form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
+            toggleCredentialFields(accountData.exchange_name);
+            if (accountData.exchange_name === 'pacifica') {
+                form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
+                form.querySelector('[name="agent_private_key"]').value = '';
+            } else if (accountData.exchange_name === 'apex') {
+                form.querySelector('[name="api_key"]').value = accountData.api_key;
+                form.querySelector('[name="api_secret"]').value = '';
+                form.querySelector('[name="passphrase"]').value = '';
+                form.querySelector('[name="zk_seeds"]').value = '';
+                form.querySelector('[name="zk_l2key"]').value = '';
+            }
             toggleAddAccountForm(true);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            const exchangeSelect = document.querySelector('select[name="exchange_name"]');
+            if (exchangeSelect) {
+                toggleCredentialFields(exchangeSelect.value);
+            }
             const exitSelect = document.querySelector('select[name="exit_mode"]');
             if(exitSelect) {
                 toggleTslSection(exitSelect.value);
