@@ -6,12 +6,13 @@
     <link rel="icon" href="{{ url_for('static', filename='logoKBot_p.png') }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
     <style>
         body {
             font-family: 'Montserrat', sans-serif;
@@ -27,27 +28,18 @@
             margin: auto;
             padding: 0;
         }
-        .logo { height: 32px; width: auto; } /* Estilo original da logo */
-
-        /* Estilos de Log (Mantidos do original, mas não são mais usados) */
-        .log-entry { display: block; padding: 0; margin: 0; line-height: 1.5; word-break: break-word; text-align: left; }
-        .log-entry.INFO { color: #c8c8c8; }
-        .log-entry.WARNING { color: #ffab40; background-color: rgba(255, 171, 64, 0.06); }
-        .log-entry.ERROR { color: #ff5252; background-color: rgba(255, 82, 82, 0.06); }
-        .log-entry.EXECUTION { color: #409cff; }
+        .logo { height: 32px; width: auto; }
 
         /* Cores PNL */
         .positive-pnl { color: #22c55e; } /* text-green-500 */
         .negative-pnl { color: #ef4444; } /* text-red-500 */
 
         .credential-fields { display: none; }
-
         .toggle-indicator.open { transform: rotate(180deg); }
 
 
-        /* --- INÍCIO DA MODIFICAÇÃO (CSS para Novo Painel de Logs) --- */
+        /* --- INÍCIO DA MODIFICAÇÃO (CSS para Novo Painel de Logs v3) --- */
 
-        /* Remove o sublinhado dos links do Tailwind dentro dos logs */
         .log-window a { text-decoration: none; }
 
         .log-window {
@@ -55,7 +47,8 @@
             font-family: 'Fira Code', monospace;
             font-size: 0.8rem; /* text-xs (12px) */
             line-height: 1.4;
-            background-color: #020617; /* bg-black/50 -> slate-950 */
+            /* Fundo ligeiramente mais escuro */
+            background-color: #0b1120;
             border-color: #334155; /* border-slate-700 */
         }
 
@@ -63,7 +56,8 @@
             display: flex;
             align-items: flex-start;
             padding: 4px 8px;
-            border-bottom: 1px solid #1e293b; /* border-slate-800 */
+            /* Remover a borda inferior */
+            border-bottom: none;
             transition: background-color 0.15s ease-in-out;
             word-break: break-all;
         }
@@ -83,11 +77,12 @@
             margin-top: 1px;
         }
 
-        .log-line[data-level="INFO"] .log-icon { color: #3b82f6; } /* text-blue-500 */
-        .log-line[data-level="SUCCESS"] .log-icon { color: #22c55e; } /* text-green-500 */
-        .log-line[data-level="WARNING"] .log-icon { color: #eab308; } /* text-yellow-500 */
-        .log-line[data-level="ERROR"] .log-icon { color: #ef4444; } /* text-red-500 */
-        .log-line[data-level="DEBUG"] .log-icon { color: #a855f7; } /* text-purple-500 */
+        /* Cores base dos ícones */
+        .log-line[data-level="INFO"] .log-icon { color: #60a5fa; } /* Azul claro */
+        .log-line[data-level="SUCCESS"] .log-icon { color: #4ade80; } /* Verde claro */
+        .log-line[data-level="WARNING"] .log-icon { color: #facc15; } /* Amarelo claro */
+        .log-line[data-level="ERROR"] .log-icon { color: #f87171; } /* Vermelho claro */
+        .log-line[data-level="DEBUG"] .log-icon { color: #c084fc; } /* Roxo claro */
 
         .log-timestamp {
             flex-shrink: 0;
@@ -106,6 +101,8 @@
             margin-top: 2px;
             color: #fff;
             text-transform: uppercase;
+            /* Adiciona borda sutil com transparência */
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         /* Mensagem */
@@ -113,9 +110,9 @@
             color: #cbd5e1; /* text-slate-300 */
             white-space: pre-wrap; /* Preserva newlines e espaços */
         }
-        .log-line[data-level="WARNING"] .log-message { color: #fde047; } /* text-yellow-300 */
-        .log-line[data-level="ERROR"] .log-message { color: #f87171; } /* text-red-400 */
-        .log-line[data-level="SUCCESS"] .log-message { color: #86efac; } /* text-green-300 */
+        /* Cor da mensagem SÓ para Warning e Error */
+        .log-line[data-level="WARNING"] .log-message { color: #fef08a; } /* Amarelo mais claro */
+        .log-line[data-level="ERROR"] .log-message { color: #fecaca; } /* Vermelho mais claro */
 
         /* Highlight da busca */
         .log-message mark {
@@ -125,22 +122,7 @@
             border-radius: 2px;
         }
 
-        /* Toolbars */
-        .log-toolbar {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #334155; /* border-slate-700 */
-        }
-
-        /* Responsivo para toolbars */
-        @media (max-width: 768px) {
-            .log-toolbar {
-                grid-template-columns: 1fr; /* 1 coluna em mobile */
-            }
-        }
-
+        /* Seção da Toolbar (controles e stats) */
         .log-toolbar-section {
             display: flex;
             flex-wrap: wrap;
@@ -148,21 +130,24 @@
             align-items: center;
         }
 
-        /* Contadores de Stats */
+        /* Contadores de Stats (NOVO ESTILO - v3) */
         .stat-badge {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 0.25rem; /* gap-1 */
             font-size: 0.75rem; /* text-xs */
-            font-weight: 600;
-            padding: 0.2rem 0.6rem;
-            border-radius: 99px; /* rounded-full */
+            font-weight: 400; /* Fonte normal */
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid;
         }
-        .stat-badge-all { background-color: #475569; color: #f1f5f9; } /* bg-slate-600 text-slate-100 */
-        .stat-badge-info { background-color: #3b82f6; color: #fff; }
-        .stat-badge-success { background-color: #22c55e; color: #fff; }
-        .stat-badge-warning { background-color: #eab308; color: #1e293b; }
-        .stat-badge-error { background-color: #ef4444; color: #fff; }
+        /* Cores ajustadas (Fundo sólido escuro, Texto claro, Borda sutil) */
+        .stat-badge-all { background-color: #334155; color: #cbd5e1; border-color: #475569; }
+        .stat-badge-info { background-color: #1e40af; color: #93c5fd; border-color: #3b82f6; } /* Fundo: blue-800, Texto: blue-300, Borda: blue-500 */
+        .stat-badge-success { background-color: #166534; color: #86efac; border-color: #22c55e; } /* Fundo: green-800, Texto: green-300, Borda: green-500 */
+        .stat-badge-warning { background-color: #854d0e; color: #fde047; border-color: #eab308; } /* Fundo: amber-800, Texto: yellow-300, Borda: yellow-500 */
+        .stat-badge-error { background-color: #991b1b; color: #fca5a5; border-color: #ef4444; } /* Fundo: red-800, Texto: red-300, Borda: red-500 */
+
 
         /* Controles (Botões) */
         .log-control-btn {
@@ -221,7 +206,7 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
         }
-        /* --- FIM DA MODIFICAÇÃO (CSS) --- */
+        /* --- FIM DA MODIFICAÇÃO (CSS v3) --- */
 
     </style>
 </head>
@@ -765,53 +750,30 @@
         {% endif %}
 
         <div class="logs-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
-            <h2 class="text-xl font-bold flex items-center gap-2 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                Logs em Tempo Real
-            </h2>
 
-            <div class="log-toolbar mb-4">
-                <div class="log-toolbar-section" id="log-stats-counters">
-                    <span class="stat-badge stat-badge-all" title="Total de logs">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
-                        <span id="log-count-all">0</span>
-                    </span>
-                    <span class="stat-badge stat-badge-info" title="Logs de Informação">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                        <span id="log-count-info">0</span>
-                    </span>
-                    <span class="stat-badge stat-badge-success" title="Logs de Sucesso">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                        <span id="log-count-success">0</span>
-                    </span>
-                    <span class="stat-badge stat-badge-warning" title="Logs de Aviso">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        <span id="log-count-warning">0</span>
-                    </span>
-                    <span class="stat-badge stat-badge-error" title="Logs de Erro">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                        <span id="log-count-error">0</span>
-                    </span>
-                </div>
-
-                <div class="log-toolbar-section">
-                    <div class="relative w-full">
-                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                            <svg class="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        </div>
-                        <input type="text" id="log-search-input" placeholder="Buscar nos logs..." class="log-filter-input pl-8">
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-4 pb-4 border-b border-slate-700">
+                <div class="flex flex-wrap items-center gap-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        Logs
+                    </h2>
+                    <div class="log-toolbar-section" id="log-stats-counters">
+                        <span class="stat-badge stat-badge-all" title="Total de logs">
+                            ALL <span id="log-count-all">0</span>
+                        </span>
+                        <span class="stat-badge stat-badge-info" title="Logs de Informação">
+                            INFO <span id="log-count-info">0</span>
+                        </span>
+                        <span class="stat-badge stat-badge-success" title="Logs de Sucesso">
+                            OK <span id="log-count-success">0</span>
+                        </span>
+                        <span class="stat-badge stat-badge-warning" title="Logs de Aviso">
+                            WARN <span id="log-count-warning">0</span>
+                        </span>
+                        <span class="stat-badge stat-badge-error" title="Logs de Erro">
+                            ERR <span id="log-count-error">0</span>
+                        </span>
                     </div>
-                    <select id="log-level-filter" class="log-filter-input flex-1">
-                        <option value="ALL">Nível: TODOS</option>
-                        <option value="INFO">Nível: INFO</option>
-                        <option value="SUCCESS">Nível: SUCCESS</option>
-                        <option value="WARNING">Nível: WARNING</option>
-                        <option value="ERROR">Nível: ERROR</option>
-                        <option value="DEBUG">Nível: DEBUG</option>
-                    </select>
-                    <select id="log-account-filter" class="log-filter-input flex-1">
-                        <option value="ALL">Conta: TODAS</option>
-                    </select>
                 </div>
 
                 <div class="log-toolbar-section justify-start md:justify-end">
@@ -836,6 +798,26 @@
                 </div>
             </div>
 
+            <div class="flex flex-wrap md:flex-nowrap items-center gap-2 mb-4">
+                <div class="relative w-full md:w-1/2">
+                    <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </div>
+                    <input type="text" id="log-search-input" placeholder="Buscar nos logs..." class="log-filter-input pl-8">
+                </div>
+                <select id="log-level-filter" class="log-filter-input w-full md:w-auto flex-1">
+                    <option value="ALL">Nível: TODOS</option>
+                    <option value="INFO">Nível: INFO</option>
+                    <option value="SUCCESS">Nível: SUCCESS</option>
+                    <option value="WARNING">Nível: WARNING</option>
+                    <option value="ERROR">Nível: ERROR</option>
+                    <option value="DEBUG">Nível: DEBUG</option>
+                </select>
+                <select id="log-account-filter" class="log-filter-input w-full md:w-auto flex-1">
+                    <option value="ALL">Conta: TODAS</option>
+                </select>
+            </div>
+
             <div id="log-window" class="log-window w-full overflow-y-auto rounded-lg p-2 border">
                 </div>
 
@@ -846,7 +828,7 @@
             <div class="flex justify-between items-center mt-3 text-sm text-slate-400">
                 <div class="flex items-center gap-2">
                     <div id="log-status-indicator" class="status-indicator active"></div>
-                    <span id="log-status-text">Conectado. Aguardando logs...</span>
+                    <span id="log-status-text">Conectando...</span>
                 </div>
                 <div>
                     Exibindo <strong id="log-count-showing" class="text-slate-200">0</strong> de <strong id="log-count-total" class="text-slate-200">0</strong> logs
@@ -856,18 +838,20 @@
         </div>
 
     <script>
+        // --- LOG PANEL LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
 
             // --- Estado Global dos Logs ---
-            let allLogs = [];
-            let filteredLogs = [];
+            let allLogs = []; // Histórico completo recebido + novos logs
+            let filteredLogs = []; // Logs atualmente visíveis após filtros
             let isPaused = false;
             let isAutoScroll = true;
-            const accountColors = {};
-            const colorPalette = [
-                '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#64748b'
+            const accountColors = {}; // Armazena cores por nome de conta/logger
+            const colorPalette = [ // Cores para os badges de conta
+                '#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#64748b'
             ];
             let colorIndex = 0;
+            const MAX_LOGS_DISPLAY = 500; // Limite de linhas no DOM para performance
 
             // --- Referências de DOM ---
             const logWindow = document.getElementById('log-window');
@@ -897,11 +881,43 @@
             const countShowing = document.getElementById('log-count-showing');
             const countTotal = document.getElementById('log-count-total');
 
+            // --- INÍCIO DA MODIFICAÇÃO (Popular Filtro Estático e Definir Cores) ---
+            // Pega a variável 'accounts' passada pelo Flask/Jinja2
+            const registeredAccountsData = {{ accounts | tojson | safe }};
+            const accountNames = registeredAccountsData.map(acc => acc.account_name).sort(); // Extrai e ordena os nomes
+
+            // Limpa o filtro (exceto a opção "TODAS") e popula com contas cadastradas
+            accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>'; // Garante que começa limpo
+            const accountFragment = document.createDocumentFragment();
+            accountNames.forEach(accName => {
+                 const option = document.createElement('option');
+                 option.value = accName;
+                 option.textContent = accName;
+                 accountFragment.appendChild(option);
+
+                 // Define a cor para o badge desta conta
+                 if (!accountColors[accName]) {
+                      accountColors[accName] = colorPalette[colorIndex % colorPalette.length];
+                      colorIndex++;
+                 }
+            });
+            accountFilter.appendChild(accountFragment); // Adiciona todas as opções de uma vez
+
+            // Define cores para loggers internos (para que os badges funcionem)
+             ['Sistema', 'Backtester', 'werkzeug', 'socketio', 'engineio'].forEach(internalName => {
+                 if (!accountColors[internalName]) {
+                      accountColors[internalName] = colorPalette[colorIndex % colorPalette.length];
+                      colorIndex++;
+                 }
+             });
+            // --- FIM DA MODIFICAÇÃO ---
+
+
             // --- Conexão SocketIO ---
             const socket = io();
+
             socket.on('connect', () => {
                 console.log('Socket.IO Conectado!');
-                statusText.textContent = 'Conectado. Logs ativos.';
                 statusIndicator.classList.add('active');
                 statusIndicator.classList.remove('paused');
             });
@@ -913,20 +929,37 @@
                 statusIndicator.classList.add('paused');
             });
 
+            socket.on('initial_logs', (initialLogs) => {
+                console.log(`Recebido histórico de ${initialLogs.length} logs.`);
+                allLogs = initialLogs;
+
+                // Apenas garante que os filtros estejam resetados ao carregar
+                // O filtro de conta já foi populado estaticamente
+                accountFilter.value = 'ALL';
+                levelFilter.value = 'ALL';
+                searchInput.value = '';
+
+                renderLogs(); // Renderiza o histórico com os filtros resetados
+                statusText.textContent = 'Conectado. Logs ativos.';
+            });
+
             socket.on('new_log', (log) => {
                 allLogs.push(log);
-                updateAccountFilterOptions(log.account);
+                 // Garante que a cor seja definida se for uma conta/logger novo (embora não adicione ao filtro)
+                 if (log.account && !accountColors[log.account]) {
+                     accountColors[log.account] = colorPalette[colorIndex % colorPalette.length];
+                     colorIndex++;
+                 }
 
                 if (!isPaused) {
-                    // Otimização: Se não houver filtros, apenas anexe o log
-                    if (isLogVisible(log, searchInput.value, levelFilter.value, accountFilter.value)) {
+                    const isVisible = isLogVisible(log, searchInput.value, levelFilter.value, accountFilter.value);
+                    if (isVisible) {
                         appendLogLine(log);
-                    } else {
-                        // Se estiver filtrado, precisa re-renderizar para atualizar contagens
-                        renderLogs();
+                        limitDOMLogs();
                     }
+                    updateCounters();
+                    updateFooterStats();
                 } else {
-                    // Se pausado, apenas atualiza contadores
                     updateCounters();
                     updateFooterStats();
                 }
@@ -934,53 +967,41 @@
 
             // --- Funções Principais ---
 
-            /**
-             * Re-renderiza toda a janela de logs com base nos filtros.
-             * Chamado ao filtrar ou limpar.
-             */
             function renderLogs() {
                 const searchTerm = searchInput.value.toLowerCase();
                 const selectedLevel = levelFilter.value;
-                const selectedAccount = accountFilter.value;
+                const selectedAccount = accountFilter.value; // Lê o valor SELECIONADO ATUALMENTE
 
                 filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
+                const logsToDisplay = filteredLogs.slice(-MAX_LOGS_DISPLAY);
 
-                if (filteredLogs.length === 0 && allLogs.length > 0) {
-                    logWindow.innerHTML = '';
+                logWindow.innerHTML = '';
+
+                if (logsToDisplay.length > 0) {
+                    const fragment = document.createDocumentFragment();
+                    logsToDisplay.forEach(log => {
+                        fragment.appendChild(createLogLineElement(log));
+                    });
+                    logWindow.appendChild(fragment);
+                    logWindow.style.display = 'block';
+                    noResultsMsg.style.display = 'none';
+                } else if (allLogs.length > 0) {
                     logWindow.style.display = 'none';
                     noResultsMsg.style.display = 'block';
-                } else if (filteredLogs.length === 0 && allLogs.length === 0) {
-                     logWindow.innerHTML = '';
-                     logWindow.style.display = 'block';
-                     noResultsMsg.style.display = 'none';
                 } else {
                     logWindow.style.display = 'block';
                     noResultsMsg.style.display = 'none';
-
-                    const fragment = document.createDocumentFragment();
-                    filteredLogs.forEach(log => {
-                        fragment.appendChild(createLogLineElement(log));
-                    });
-                    logWindow.innerHTML = ''; // Limpa a janela
-                    logWindow.appendChild(fragment); // Adiciona todos de uma vez
                 }
 
                 updateCounters();
-                updateFooterStats();
-                scrollToBottom();
+                updateFooterStats(logsToDisplay.length);
+                // Não chama scrollToBottom aqui diretamente, deixa limitDOMLogs cuidar disso
             }
 
-            /**
-             * Adiciona uma única linha de log ao final da janela.
-             * Mais eficiente do que re-renderizar tudo.
-             */
             function appendLogLine(log) {
-                const searchTerm = searchInput.value.toLowerCase();
-
-                // Se a busca estiver ativa, precisamos destacar, então não podemos só anexar
-                if (searchTerm) {
-                    renderLogs();
-                    return;
+                if (searchInput.value) { // Se busca ativa, renderLogs já trata
+                     renderLogs(); // Re-renderiza para aplicar highlight e limite
+                     return;
                 }
 
                 logWindow.style.display = 'block';
@@ -988,15 +1009,30 @@
 
                 const logElement = createLogLineElement(log);
                 logWindow.appendChild(logElement);
-
-                updateCounters();
-                updateFooterStats();
-                scrollToBottom();
             }
 
-            /**
-             * Cria o elemento DOM para uma única linha de log.
-             */
+            function limitDOMLogs() {
+                let logsRemoved = 0;
+                // Só remove se não estiver buscando
+                // E só remove se o número de filhos EXCEDER o limite
+                while (logWindow.childElementCount > MAX_LOGS_DISPLAY && !searchInput.value) {
+                     if(logWindow.firstChild) { // Checa se existe antes de remover
+                         logWindow.removeChild(logWindow.firstChild);
+                         logsRemoved++;
+                     } else {
+                         break; // Sai do loop se não houver mais filhos
+                     }
+                }
+
+                updateFooterStats(); // Atualiza contagem exibida
+
+                // Scroll só se autoscroll estiver ativo
+                if (isAutoScroll) {
+                    scrollToBottom();
+                }
+            }
+
+
             function createLogLineElement(log) {
                 const line = document.createElement('div');
                 line.className = 'log-line';
@@ -1006,19 +1042,59 @@
                 const timestamp = `<span class="log-timestamp">${log.timestamp}</span>`;
                 const badge = getAccountBadge(log.account);
 
-                // --- Mensagem e Highlight ---
                 const searchTerm = searchInput.value;
-                let message = log.is_html ? log.message : escapeHTML(log.message);
+                let message = log.is_html ? log.message : escapeHTML(log.message || '');
 
-                if (searchTerm && !log.is_html) {
-                    // Aplica highlight. 'gi' = global, insensitive
-                    const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
-                    message = message.replace(regex, '<mark>$&</mark>');
+                if (searchTerm && !log.is_html && message) {
+                    try {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = message;
+                        const textNodes = getTextNodes(tempDiv);
+                        const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
+
+                        textNodes.forEach(node => {
+                            const parent = node.parentNode;
+                            if (!parent) return; // Adiciona checagem de segurança
+                            const text = node.nodeValue;
+                            let lastIndex = 0;
+                            let match;
+                            const fragment = document.createDocumentFragment();
+
+                            while ((match = regex.exec(text)) !== null) {
+                                fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                                const mark = document.createElement('mark');
+                                mark.textContent = match[0];
+                                fragment.appendChild(mark);
+                                lastIndex = regex.lastIndex;
+                            }
+                            fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+                             // Verifica se o nó ainda pertence ao pai antes de substituir
+                            if (node.parentNode === parent) {
+                                parent.replaceChild(fragment, node);
+                            }
+                        });
+                        message = tempDiv.innerHTML;
+                    } catch (e) {
+                         console.error("Erro no regex de highlight:", e);
+                    }
                 }
 
                 line.innerHTML = `${icon}${timestamp}${badge}<span class="log-message">${message}</span>`;
                 return line;
             }
+
+            function getTextNodes(node) {
+                const textNodes = [];
+                const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+                let currentNode;
+                while(currentNode = walk.nextNode()) {
+                     if (currentNode.parentNode && currentNode.parentNode.nodeName !== 'SCRIPT' && currentNode.parentNode.nodeName !== 'STYLE') { // Checa parentNode
+                          textNodes.push(currentNode);
+                     }
+                }
+                return textNodes;
+            }
+
 
             // --- Funções Auxiliares de UI ---
 
@@ -1039,72 +1115,80 @@
                 countError.textContent = error;
             }
 
-            function updateFooterStats() {
-                countShowing.textContent = logWindow.childElementCount; // Contagem de elementos reais
+            function updateFooterStats(showingCount = null) {
+                countShowing.textContent = showingCount !== null ? showingCount : logWindow.childElementCount;
                 countTotal.textContent = allLogs.length;
             }
 
+
             function scrollToBottom() {
-                if (isAutoScroll) {
-                    logWindow.scrollTop = logWindow.scrollHeight;
+                 // Verifica se o usuário não rolou para cima manualmente
+                 // Margem de erro de ~10 pixels
+                const isScrolledToBottom = logWindow.scrollHeight - logWindow.clientHeight <= logWindow.scrollTop + 10;
+
+                if (isAutoScroll || isScrolledToBottom) {
+                    const lastLog = logWindow.lastElementChild;
+                    if(lastLog) {
+                         // Usar 'instant' pode ser melhor para logs rápidos
+                         lastLog.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
                 }
             }
 
             function getLevelIcon(level) {
-                let svg = '';
-                switch (level) {
-                    case 'INFO':
-                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
-                        break;
-                    case 'SUCCESS':
-                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
-                        break;
-                    case 'WARNING':
-                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-                        break;
-                    case 'ERROR':
-                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
-                        break;
-                    default: // DEBUG e outros
-                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
-                }
-                return svg;
+                let svgClass = "log-icon";
+                let svgContent = '';
+                 switch (level) {
+                    case 'INFO': svgContent = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'; break;
+                    case 'SUCCESS': svgContent = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'; break;
+                    case 'WARNING': svgContent = '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'; break;
+                    case 'ERROR': svgContent = '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'; break;
+                    default: svgClass += " text-purple-400"; svgContent = '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>';
+                 }
+                 return `<svg class="${svgClass}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgContent}</svg>`;
             }
 
             function getAccountBadge(account) {
-                if (!accountColors[account]) {
-                    accountColors[account] = colorPalette[colorIndex % colorPalette.length];
-                    colorIndex++;
-                }
-                const color = accountColors[account];
-                return `<span class="log-account-badge" style="background-color: ${color}">${escapeHTML(account)}</span>`;
+                 if (!account) return '';
+                 let color = accountColors[account]; // Pega a cor já definida
+                 if (!color) { // Se por acaso não tiver cor (não deveria acontecer), define uma
+                      color = colorPalette[colorIndex % colorPalette.length];
+                      accountColors[account] = color;
+                      colorIndex++;
+                 }
+                 return `<span class="log-account-badge" style="background-color: ${color}; border-color: ${hexToRgba(color, 0.5)};">${escapeHTML(account)}</span>`;
             }
 
-            function updateAccountFilterOptions(account) {
-                if (!accountColors[account]) { // A cor ser definida é o gatilho para "nova conta"
-                    const option = document.createElement('option');
-                    option.value = account;
-                    option.textContent = account;
-                    accountFilter.appendChild(option);
-                }
+            function hexToRgba(hex, alpha = 1) {
+                // Adiciona checagem se hex é válido
+                 if (!hex || !hex.startsWith('#') || hex.length < 7) {
+                      return `rgba(100, 116, 139, ${alpha})`; // Cor padrão (cinza)
+                 }
+                const bigint = parseInt(hex.slice(1), 16);
+                const r = (bigint >> 16) & 255;
+                const g = (bigint >> 8) & 255;
+                const b = bigint & 255;
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             }
+
+            // Removida: sortSelectOptions - não é mais necessária aqui
+            // Removida: updateAccountFilterOptions - não é mais necessária aqui
 
             // --- Funções de Filtro ---
-
-            /**
-             * Verifica se um log deve ser visível com base nos filtros.
-             */
             function isLogVisible(log, searchTerm, selectedLevel, selectedAccount) {
+                 if (!log) return false;
                 const levelMatch = selectedLevel === 'ALL' || log.level === selectedLevel;
                 const accountMatch = selectedAccount === 'ALL' || log.account === selectedAccount;
-                const searchMatch = !searchTerm ||
-                                    (log.message && log.message.toLowerCase().includes(searchTerm)) ||
-                                    (log.account && log.account.toLowerCase().includes(searchTerm));
+                const safeSearchTerm = searchTerm || '';
+                const searchMatch = !safeSearchTerm ||
+                                    (log.timestamp && log.timestamp.includes(safeSearchTerm)) ||
+                                    (log.account && log.account.toLowerCase().includes(safeSearchTerm)) ||
+                                    (log.message && log.message.toLowerCase().includes(safeSearchTerm));
                 return levelMatch && accountMatch && searchMatch;
             }
 
-            // --- Funções de Controle ---
 
+            // --- Funções de Controle ---
             function toggleAutoScroll() {
                 isAutoScroll = !isAutoScroll;
                 autoScrollBtn.classList.toggle('active', isAutoScroll);
@@ -1130,53 +1214,50 @@
                     statusText.textContent = 'Conectado. Logs ativos.';
                     statusIndicator.classList.add('active');
                     statusIndicator.classList.remove('paused');
-                    // Re-renderiza para incluir logs perdidos
-                    renderLogs();
+                    renderLogs(); // Re-renderiza para aplicar logs que chegaram
                 }
             }
 
             function clearLogs() {
-                if (confirm('Deseja limpar todos os logs da tela? (Isso não afeta os logs do servidor)')) {
-                    allLogs = [];
-                    filteredLogs = [];
+                 // Limpa apenas o DOM
+                if (confirm('Deseja limpar os logs visíveis na tela? (O histórico completo será mantido)')) {
                     logWindow.innerHTML = '';
-                    // Resetar filtros de conta
-                    accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>';
-                    accountColors = {};
-                    colorIndex = 0;
+                    updateFooterStats(0);
+                    noResultsMsg.style.display = 'none';
+                    // Re-renderiza com os filtros atuais (mostrará vazio ou "nenhum resultado")
                     renderLogs();
                 }
             }
 
-            /**
-             * Converte um log de objeto para texto plano.
-             */
             function logToText(log) {
-                let message = log.message;
-                // Se for HTML (backtest), extrai o texto
+                 if (!log) return "";
+                let message = log.message || "";
                 if (log.is_html) {
                     const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = message;
-                    message = tempDiv.textContent || tempDiv.innerText || '';
+                    const preElement = tempDiv.querySelector('pre');
+                    message = preElement ? (preElement.textContent || preElement.innerText || '') : (tempDiv.textContent || tempDiv.innerText || '');
                 }
-                return `[${log.timestamp}] [${log.account}] [${log.level}] ${message}`;
+                 message = message.replace(/\s+/g, ' ').trim();
+                return `[${log.timestamp || 'N/A'}] [${log.account || 'N/A'}] [${log.level || 'N/A'}] ${message}`;
             }
 
             function copyLogs() {
-                const logsToCopy = filteredLogs.map(logToText).join('\n');
-                navigator.clipboard.writeText(logsToCopy).then(() => {
-                    alert(`${filteredLogs.length} linhas de log copiadas!`);
+                const logsToCopyText = filteredLogs.map(logToText).join('\n'); // Usa filteredLogs (completo na memória)
+                navigator.clipboard.writeText(logsToCopyText).then(() => {
+                    alert(`${filteredLogs.length} logs filtrados copiados!`);
                 }).catch(err => {
                     console.error('Falha ao copiar logs: ', err);
+                    alert('Falha ao copiar logs. Verifique o console.');
                 });
             }
 
             function downloadLogs() {
-                const logsToDownload = filteredLogs.map(logToText).join('\n');
-                const blob = new Blob([logsToDownload], { type: 'text/plain;charset=utf-8' });
+                const logsToDownloadText = filteredLogs.map(logToText).join('\n'); // Usa filteredLogs (completo na memória)
+                const blob = new Blob([logsToDownloadText], { type: 'text/plain;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                const timestamp = new Date().toISOString().replace(/:/g, '-');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 a.href = url;
                 a.download = `kbot-logs-${timestamp}.txt`;
                 document.body.appendChild(a);
@@ -1188,17 +1269,24 @@
             // --- Funções de Utilidade ---
             function escapeHTML(str) {
                 if (typeof str !== 'string') return '';
-                return str.replace(/[&<>"']/g, (match) => {
-                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
-                });
+                return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
             }
 
             function escapeRegExp(string) {
-                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& significa a string inteira
+                 if (typeof string !== 'string') return '';
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             }
 
             // --- Bind de Eventos ---
-            searchInput.addEventListener('input', renderLogs);
+            // Adiciona debounce ao input de busca para performance
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                 clearTimeout(searchTimeout);
+                 searchTimeout = setTimeout(() => {
+                      renderLogs();
+                 }, 250); // Atraso de 250ms
+            });
+            //searchInput.addEventListener('input', renderLogs); // <-- Remove chamada direta
             levelFilter.addEventListener('change', renderLogs);
             accountFilter.addEventListener('change', renderLogs);
 
@@ -1208,35 +1296,41 @@
             copyBtn.addEventListener('click', copyLogs);
             downloadBtn.addEventListener('click', downloadLogs);
 
-            // Inicializa a UI
+             // Adiciona listener para desativar autoscroll se usuário rolar para cima
+             logWindow.addEventListener('scroll', () => {
+                 // Se o usuário rolou para cima e o autoscroll está ativo
+                 if (logWindow.scrollTop < logWindow.scrollHeight - logWindow.clientHeight - 50 && isAutoScroll) {
+                      isAutoScroll = false;
+                      autoScrollBtn.classList.remove('active');
+                 }
+             });
+
+            // Inicializa a UI (mostra vazio inicialmente, espera 'initial_logs')
             renderLogs();
         });
-    </script>
-    <script>
+
+
+        // --- SCRIPT ORIGINAL DA PÁGINA ---
         const exchangesData = {{ exchanges_data | tojson | safe }};
 
-        // --- JS PARA COLAPSAR SETUPS (CORRIGIDO) ---
         function toggleSetups(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
             if (content) {
-                 // Verifica usando style.display
                 if (content.style.display === 'none') {
-                    content.style.display = 'block'; // Mostra
+                    content.style.display = 'block';
                     if (icon) icon.style.transform = 'rotate(0deg)';
                 } else {
-                    content.style.display = 'none'; // Esconde
+                    content.style.display = 'none';
                     if (icon) icon.style.transform = 'rotate(180deg)';
                 }
             }
         }
 
-        // --- LÓGICA DO FORMULÁRIO DE SETUP (Mantida) ---
         function resetSetupForm() {
             const form = document.getElementById('setup-form');
             if (!form) return;
             form.reset();
-            // Define os valores padrão do formulário (para "Adicionar")
             if(form.querySelector('[name="risk"]')) form.querySelector('[name="risk"]').value = "1.0";
             if(form.querySelector('[name="leverage"]')) form.querySelector('[name="leverage"]').value = "10";
             if(form.querySelector('[name="sl_value"]')) form.querySelector('[name="sl_value"]').value = "2.0";
@@ -1244,25 +1338,21 @@
             if(form.querySelector('[name="direction_mode"]')) form.querySelector('[name="direction_mode"]').value = "long_short";
             if(form.querySelector('[name="exit_mode"]')) form.querySelector('[name="exit_mode"]').value = "passivo";
             if(form.querySelector('[name="tsl_type"]')) form.querySelector('[name="tsl_type"]').value = "none";
-            // Reseta o TSL para o padrão
             toggleTslSection('passivo');
         }
 
         function hideSetupForm() {
             const section = document.getElementById('add-setup-form-section');
             if (section) section.style.display = 'none';
-            resetSetupForm(); // Limpa o formulário ao fechar
+            resetSetupForm();
         }
 
         function showSetupForm(setupData) {
             const section = document.getElementById('add-setup-form-section');
             const form = document.getElementById('setup-form');
-            if (!section || !form) return; // Sai se os elementos não existem
-
-            resetSetupForm(); // Começa limpando para os padrões
-
-            if (setupData) {
-                // MODO EDITAR: Preenche o formulário
+            if (!section || !form) return;
+            resetSetupForm();
+            if (setupData) { // Modo Editar
                 form.querySelector('[name="account_name"]').value = setupData.account_name;
                 form.querySelector('[name="base_currency"]').value = setupData.base_currency;
                 form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
@@ -1270,14 +1360,11 @@
                 form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
                 form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
                 form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
-
                 const slValueInput = form.querySelector('[name="sl_value"]');
                 slValueInput.value = (setupData.stop_loss_config.type === 'percentage') ? setupData.stop_loss_config.value * 100 : setupData.stop_loss_config.value;
-
                 const exitModeSelect = form.querySelector('[name="exit_mode"]');
                 exitModeSelect.value = setupData.exit_mode;
-                toggleTslSection(setupData.exit_mode); // Mostra/oculta TSL
-
+                toggleTslSection(setupData.exit_mode);
                 const tslConfig = setupData.trailing_stop_config;
                 const tslTypeSelect = form.querySelector('[name="tsl_type"]');
                 if (tslConfig && tslConfig.type !== 'none') {
@@ -1291,31 +1378,20 @@
                 } else if (tslTypeSelect) {
                     tslTypeSelect.value = 'none';
                 }
-                toggleTslOptions(tslTypeSelect ? tslTypeSelect.value : 'none'); // Mostra/oculta opções de TSL
-
-            } else {
-                // MODO ADICIONAR: O formulário já foi resetado para os padrões
-                // Apenas garante que a primeira conta esteja selecionada, se houver
+                toggleTslOptions(tslTypeSelect ? tslTypeSelect.value : 'none');
+            } else { // Modo Adicionar
                 {% if accounts %}
                 if (form.querySelector('[name="account_name"]')) {
                     form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}";
                 }
                 {% endif %}
             }
-
-            section.style.display = 'block'; // Mostra o formulário
-            section.scrollIntoView({ behavior: 'smooth' }); // Rola até ele
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth' });
         }
 
-
-        // --- JS ORIGINAL (Quase todo mantido) ---
-
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert("Endereço copiado!");
-            }, (err) => {
-                alert("Falha ao copiar: ", err);
-            });
+            navigator.clipboard.writeText(text).then(() => { alert("Endereço copiado!"); }, (err) => { alert("Falha ao copiar: ", err); });
         }
 
         function validateAccountForm() {
@@ -1326,8 +1402,13 @@
             const exchange = exchangesData[exchangeName];
             if (exchange && !exchange.multi_account_allowed && exchange.accounts && exchange.accounts.length > 0) {
                 if (!originalAccountName || (exchange.accounts[0] && exchange.accounts[0].account_name !== originalAccountName)) {
-                    alert(`A exchange '${exchangeName}' não permite múltiplas contas. Você só pode editar a conta existente.`);
-                    return false;
+                    alert(`A exchange '${exchangeName}' não permite múltiplas contas. Você só pode editar a conta existente.`); return false;
+                }
+            }
+            const requiredFields = form.querySelectorAll('[required]');
+            for (let field of requiredFields) {
+                if (field.offsetParent !== null && !field.value.trim()) {
+                    alert(`O campo '${field.previousElementSibling?.textContent || field.name}' é obrigatório.`); field.focus(); return false;
                 }
             }
             return true;
@@ -1349,8 +1430,10 @@
         function toggleTslOptions(tslType) {
             const breakevenOptions = document.getElementById('tsl-breakeven-options');
             const atrOptions = document.getElementById('tsl-atr-options');
+            const removeTpCheckboxLabel = document.querySelector('label[title*="Take Profit original"]');
             if (breakevenOptions) breakevenOptions.style.display = tslType === 'breakeven' ? 'flex' : 'none';
             if (atrOptions) atrOptions.style.display = tslType === 'atr' ? 'flex' : 'none';
+            if (removeTpCheckboxLabel) { removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none'; }
         }
 
         function togglePositionsTable() {
@@ -1361,9 +1444,12 @@
             if (isOpen) {
                 section.style.display = 'none';
                 icon.classList.remove('open');
+                icon.innerHTML = '<path d="m6 9 6 6 6-6"/>';
             } else {
                 section.style.display = 'block';
                 icon.classList.add('open');
+                icon.innerHTML = '<path d="m18 15-6-6-6 6"/>';
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
 
@@ -1372,9 +1458,7 @@
             if (!section) return;
             if (section.style.display === 'none' || is_editing) {
                 section.style.display = 'block';
-                if(is_editing) {
-                    section.scrollIntoView({ behavior: 'smooth' });
-                }
+                if(is_editing) { section.scrollIntoView({ behavior: 'smooth' }); }
             } else {
                 section.style.display = 'none';
                 resetAccountForm();
@@ -1386,6 +1470,7 @@
             if (!section) return;
             if (section.style.display === 'none') {
                 section.style.display = 'block';
+                 section.scrollIntoView({ behavior: 'smooth' });
             } else {
                 section.style.display = 'none';
             }
@@ -1399,9 +1484,12 @@
             if (title) title.innerText = 'Adicionar Nova Conta';
             const originalNameInput = document.getElementById('original_account_name');
             if (originalNameInput) originalNameInput.value = '';
-            // Reset fields visibility based on the first option in select
             const exchangeSelect = form.querySelector('select[name="exchange_name"]');
-            if (exchangeSelect) toggleCredentialFields(exchangeSelect.value);
+            if (exchangeSelect) {
+                 exchangeSelect.selectedIndex = 0;
+                 toggleCredentialFields(exchangeSelect.value);
+            }
+             form.querySelectorAll('input[type="password"]').forEach(input => input.value = '');
         }
 
         function toggleCredentialFields(exchangeName) {
@@ -1409,74 +1497,71 @@
             const apexFields = document.getElementById('apex-fields');
             const pacificaInputs = document.querySelectorAll('.pacifica-required');
             const apexInputs = document.querySelectorAll('.apex-required');
+            const isEditing = !!document.getElementById('original_account_name')?.value;
 
             if (pacificaFields) pacificaFields.style.display = exchangeName === 'pacifica' ? 'block' : 'none';
             if (apexFields) apexFields.style.display = exchangeName === 'apex' ? 'block' : 'none';
 
-            pacificaInputs.forEach(input => input.required = (exchangeName === 'pacifica'));
-            apexInputs.forEach(input => input.required = (exchangeName === 'apex'));
+            pacificaInputs.forEach(input => { input.required = (exchangeName === 'pacifica') && (!isEditing || input.name === 'main_public_key'); });
+            apexInputs.forEach(input => {
+                 const isSecretField = ['api_secret', 'passphrase', 'zk_seeds', 'zk_l2key'].includes(input.name);
+                 input.required = (exchangeName === 'apex') && (!isEditing || !isSecretField);
+            });
         }
 
         function editAccount(accountData) {
             const form = document.getElementById('account-form');
             if (!form) return;
+            resetAccountForm();
             const exchangeSelect = form.querySelector('[name="exchange_name"]');
             const title = document.getElementById('account-form-title');
-
             if (title) title.innerText = 'Editar Conta: ' + accountData.account_name;
             form.querySelector('[name="original_account_name"]').value = accountData.account_name;
             form.querySelector('[name="account_name"]').value = accountData.account_name;
             if (exchangeSelect) exchangeSelect.value = accountData.exchange_name;
             form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
-
-            toggleCredentialFields(accountData.exchange_name); // Show/hide correct fields
-
-            // Clear password/secret fields, but fill public ones
+            toggleCredentialFields(accountData.exchange_name);
             if (accountData.exchange_name === 'pacifica') {
                 if(form.querySelector('[name="main_public_key"]')) form.querySelector('[name="main_public_key"]').value = accountData.main_public_key || '';
-                if(form.querySelector('[name="agent_private_key"]')) form.querySelector('[name="agent_private_key"]').value = ''; // Clear secret
             } else if (accountData.exchange_name === 'apex') {
                 if(form.querySelector('[name="api_key"]')) form.querySelector('[name="api_key"]').value = accountData.api_key || '';
-                if(form.querySelector('[name="api_secret"]')) form.querySelector('[name="api_secret"]').value = ''; // Clear secret
-                if(form.querySelector('[name="passphrase"]')) form.querySelector('[name="passphrase"]').value = ''; // Clear secret
-                if(form.querySelector('[name="zk_seeds"]')) form.querySelector('[name="zk_seeds"]').value = ''; // Clear secret
-                if(form.querySelector('[name="zk_l2key"]')) form.querySelector('[name="zk_l2key"]').value = ''; // Clear secret (though this might be public?)
             }
-            toggleAddAccountForm(true); // Show and scroll to form
+            toggleCredentialFields(accountData.exchange_name); // Re-aplica a lógica de required
+            toggleAddAccountForm(true);
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initial setup for exchange fields visibility
-            const exchangeSelect = document.querySelector('select[name="exchange_name"]');
-            if (exchangeSelect) {
-                toggleCredentialFields(exchangeSelect.value);
+        // --- DOMContentLoaded Original (Ajustado) ---
+         document.addEventListener('DOMContentLoaded', () => {
+            // Configuração inicial dos formulários e seções colapsáveis
+            const accountFormExchangeSelect = document.querySelector('#account-form select[name="exchange_name"]');
+            if (accountFormExchangeSelect) { toggleCredentialFields(accountFormExchangeSelect.value); }
+            const setupFormExitSelect = document.querySelector('#setup-form select[name="exit_mode"]');
+            if(setupFormExitSelect) {
+                toggleTslSection(setupFormExitSelect.value);
+                 const tslTypeSelect = document.querySelector('#setup-form select[name="tsl_type"]');
+                 if(tslTypeSelect) { toggleTslOptions(tslTypeSelect.value); }
             }
-            // Initial setup for TSL fields visibility
-            const exitSelect = document.querySelector('select[name="exit_mode"]');
-            if(exitSelect) {
-                toggleTslSection(exitSelect.value);
-            }
-
-            // Inicia a tabela de posições colapsada
             const positionsSection = document.getElementById('positions-section');
             if (positionsSection) positionsSection.style.display = 'none';
-
-            // Inicia o formulário de setup oculto
             const setupFormSection = document.getElementById('add-setup-form-section');
             if (setupFormSection) setupFormSection.style.display = 'none';
-
-            // Inicia os setups de bot colapsados por padrão (CORRIGIDO)
-            document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none'); // Use style.display
-            document.querySelectorAll('[id^^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
-
-            // CORREÇÃO: Mostra o formulário de setup se houver resultado de backtest
+            document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('[id^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
             {% if backtest_result %}
                 const setupForm = document.getElementById('add-setup-form-section');
                 if (setupForm) {
                     setupForm.style.display = 'block';
+                     const baseCurrencyInput = setupForm.querySelector('input[name="base_currency"]');
+                     if (baseCurrencyInput && "{{ last_backtest_symbol }}") {
+                         baseCurrencyInput.value = "{{ last_backtest_symbol }}".split('/')[0];
+                     }
                     setupForm.scrollIntoView({ behavior: 'smooth' });
                 }
             {% endif %}
+             const positionsToggleIcon = document.getElementById('positions-toggle-icon');
+             if (positionsToggleIcon) { positionsToggleIcon.innerHTML = '<path d="m6 9 6 6 6-6"/>'; }
+
+             // *** A lógica de popular o filtro de logs JÁ ESTÁ no outro DOMContentLoaded ***
         });
     </script>
 </body>
