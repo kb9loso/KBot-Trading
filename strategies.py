@@ -72,9 +72,9 @@ STRATEGIES = {
         "timeframe": "1m",
         "min_candles": 50,
         "tsl_atr_multiple": 3.5,
-        "long_entry": lambda c, p: c['close'] > c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] < 60,
-        "short_entry": lambda c, p: c['close'] < c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.5 and c['RSI_9'] > 40,
-        "exit": lambda c, p, side: (c['close'] < c['EMA_9'] or c['STOCH_K'] > 80) if side == 'long' else (c['close'] > c['EMA_9'] or c['STOCH_K'] < 20)
+        "long_entry": lambda c, p: (c['close'] > c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.8 and c['RSI_9'] < 58 and c['STOCH_K'] < 80),
+        "short_entry": lambda c, p: (c['close'] < c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.8 and c['RSI_9'] > 42 and c['STOCH_K'] > 20),
+        "exit": lambda c, p, side: ((c['close'] < c['EMA_9'] or c['STOCH_K'] > 80) if side == 'long' else (c['close'] > c['EMA_9'] or c['STOCH_K'] < 20))
     },
     "9. MACD/RSI Trend Follower (1h)": {
         "description": "Segue tendências com confirmação múltipla, agora com o filtro adicional da EMA 200.",
@@ -200,17 +200,18 @@ def get_btc_trend_filter(data_source_exchanges: list) -> str:
         print("Não foi possível obter dados válidos do BTC. Filtro desativado temporariamente.")
         return "long_short"
 
-    btc_data['EMA_Short'] = btc_data['close'].ewm(span=9, adjust=False).mean()
-    btc_data['EMA_Long'] = btc_data['close'].ewm(span=21, adjust=False).mean()
+    btc_data['EMA_Short'] = btc_data['close'].ewm(span=7, adjust=False).mean()
+    btc_data['EMA_Long'] = btc_data['close'].ewm(span=14, adjust=False).mean()
 
+    # Sinal bruto (1 para alta, -1 para baixa)
     raw_signal = np.where(btc_data['EMA_Short'] > btc_data['EMA_Long'], 1, -1)
-    smooth_signal = pd.Series(raw_signal).rolling(window=3, min_periods=1).mean()
+    recent = pd.Series(raw_signal).iloc[-3:].mean()
 
-    recent = smooth_signal.iloc[-3:].mean()
     if recent > 0.2:
         trend = "long_only"
     elif recent < -0.2:
         trend = "short_only"
     else:
         trend = "long_short"
+
     return trend

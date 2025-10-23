@@ -4,171 +4,305 @@
     <meta charset="UTF-8">
     <title>KBot - Trading Bot</title>
     <link rel="icon" href="{{ url_for('static', filename='logoKBot_p.png') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Montserrat', sans-serif; font-weight: 400; margin: 20px; background-color: #121212; color: #e0e0e0; font-size: 14px; }
-        .container { max-width: 1200px; margin: auto; background: #212529; padding: 25px; border-radius: 8px; border: 1px solid #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .logo { height: 32px; width: auto; }
-        h1 { font-size: 24px; color: #ffffff; margin: 0; text-align: center; flex-grow: 1; font-weight: 600; }
-        .header-right-side { display: flex; align-items: center; gap: 20px; }
-        .version-info { font-size: 11px; text-align: right; color: #a0a0a0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-        .version-text { font-family: "SF Mono", monospace; }
-        .update-link { text-decoration: none; }
-        .status-text.warning { color: #ffab40; }
-        .status-text .fas { margin-right: 4px; }
-        .docs-link { color: #87CEFA; font-weight: 600; font-size: 12px; }
-        .docs-link:hover { text-decoration: underline; }
-        h2 { font-size: 15px; color: #f5f5f5; border-bottom: 2px solid #444; padding-bottom: 8px; margin-top: 25px; font-weight: 500; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #444; padding-bottom: 8px; }
-        .section-header h2 { border-bottom: none; margin: 0; padding: 0; }
-        .status-text { font-weight: 700; }
-        .status-text.positive { color: #28a745; }
-        .status-text.negative { color: #dc3545; }
-        .info-section, .form-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
-        .info-section h2:not(.section-header h2), .form-section h2 { margin-top: 0; margin-bottom: 10px; }
-        .donate-section { text-align: center; font-size: 12px; }
-        .donate-section strong { color: #ffffff; font-weight: 600; display: block; margin-bottom: 5px; }
-        .donate-address { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 4px; }
-        .donate-address span { color: #a0a0a0; font-family: "SF Mono", monospace; font-size: 11px; }
-        .copy-icon { cursor: pointer; color: #007bff; }
-        .copy-icon:hover { color: #0056b3; }
-        .account-info, .dashboard-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
-        .metric-card { background: #363636; padding: 15px; border-radius: 5px; border: 1px solid #444; display: flex; align-items: center; gap: 15px; position: relative; }
-        .metric-icon { font-size: 1.7em; color: #8a939e; flex-shrink: 0; width: 35px; text-align: center; }
-        .metric-text { flex-grow: 1; text-align: center; }
-        .metric-text strong { display: block; font-size: 0.75em; margin-bottom: 3px; text-transform: uppercase; color: #a0a0a0; font-weight: 500; }
-        .metric-text span { font-size: 1.3em; font-weight: 700; color: #f5f5f5; }
-        .metric-text span.positive { color: #28a745; }
-        .metric-text span.negative { color: #dc3545; }
-        .toggle-indicator { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #8a939e; transition: transform 0.3s ease; }
-        .toggle-indicator.open { transform: translateY(-50%) rotate(180deg); }
-        .logs-section { padding: 15px; background: #2a2a2e; border-radius: 5px; margin-top: 15px; }
-        .logs-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;}
-        .logs-header h2 { margin: 0; padding: 0; font-size: 1rem; border-bottom: none}
-        .log-filters { display: flex; gap: 10px; margin: 0; padding: 0; margin-left: auto; align-items: center; }
-        .logs { background: #1e1e2f; color: #c8c8c8; border: 1px solid #333; height: 250px; overflow-y: auto; padding: 8px; font-family: "SF Mono", monospace; font-size: 0.85em; border-radius: 5px; text-align: left; width: 100%; box-sizing: border-box; }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 400;
+        }
+        html { color-scheme: dark; }
+        body {
+            background-color: #0f172a; /* fallback */
+            background-image: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a);
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 0;
+        }
+        .logo { height: 32px; width: auto; } /* Estilo original da logo */
+
+        /* Estilos de Log (Mantidos do original, mas não são mais usados) */
         .log-entry { display: block; padding: 0; margin: 0; line-height: 1.5; word-break: break-word; text-align: left; }
         .log-entry.INFO { color: #c8c8c8; }
         .log-entry.WARNING { color: #ffab40; background-color: rgba(255, 171, 64, 0.06); }
         .log-entry.ERROR { color: #ff5252; background-color: rgba(255, 82, 82, 0.06); }
         .log-entry.EXECUTION { color: #409cff; }
-        .logs::-webkit-scrollbar { width: 8px; }
-        .logs::-webkit-scrollbar-track { background: #2a2a3f; border-radius: 5px; }
-        .logs::-webkit-scrollbar-thumb { background-color: #555; border-radius: 5px; border: 2px solid #2a2a3f; }
-        .form-section form { display: flex; flex-direction: column; gap: 15px; }
-        .form-row { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
-        button { padding: 8px 16px; border: none; color: white; border-radius: 5px; cursor: pointer; font-size: 1em; font-family: 'Montserrat', sans-serif; font-weight: 500;}
-        .delete-btn { background-color: transparent; color: #FF6D00; padding: 4px 8px; font-size: 1.1em; }
-        .edit-btn { background-color: transparent; color: #17a2b8; padding: 4px 8px; font-size: 1.1em; margin-right: 5px; border: none; cursor: pointer; }
-        .start-btn { background-color: #28a745; }
-        .add-btn { background-color: #0d6efd; }
-        .stop-btn { background-color: #dc3545; }
-        .refresh-btn { background-color: #6c757d; }
-        .notification-btn { background-color: #6f42c1; }
-        input, select { padding: 8px; border: 1px solid #555; border-radius: 5px; font-size: 1em; background-color: #333; color: #e0e0e0; font-family: 'Montserrat', sans-serif; }
-        .form-section label { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; font-weight: 500; color: #c0c0c0; }
-        .form-section .value-input { width: 90px; }
-        .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        table .start-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #28a745; }
-        table .stop-btn { background-color: transparent; font-size: 1.4em; padding: 1px 8px; color: #dc3545; }
-        .notification-toggle-btn { background-color: transparent; font-size: 1.1em; padding: 4px 8px; border: none; cursor: pointer; }
-        .notification-toggle-btn .fa-bell { color: #28a745; }
-        .notification-toggle-btn .fa-bell-slash { color: #6c757d; }
-        th, td { padding: 8px 12px; border: 1px solid #444; text-align: left; vertical-align: middle; font-size: 13px;}
-        th { background-color: #343a40; font-weight: 600; }
-        tr:nth-child(even) { background-color: #2c2f33; }
-        .status-icon { font-size: 0.8em; margin-right: 8px; }
-        .status-icon.open { color: #28a745; }
-        .status-icon.idle { color: #ffc107; }
-        .clickable-card {cursor: pointer;}
-        .positive-pnl { color: #28a745; }
-        .negative-pnl { color: #dc3545; }
-        .action-column { width: 1%; white-space: nowrap; }
-        .action-buttons-container { display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; }
-        .asset-cell-container { display: flex; align-items: center; }
-        .header-actions { display: flex; gap: 10px; flex-wrap: wrap;}
-        .backtest-result { margin-top: 20px; padding: 12px; background-color: #2a2a2e; border: 1px solid #444; border-radius: 5px; color: #e0e0e0; font-size: 0.9em; }
-        .backtest-result .result-header { display: flex; align-items: center; gap: 8px; font-size: 1em; font-weight: 600; color: #ffffff; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #444; }
-        .backtest-result .result-body p { margin: 4px 0; font-size: 0.9em; }
-        .backtest-result .result-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; border-bottom: 1px solid #444; padding-bottom: 12px; margin-bottom: 12px; }
-        .backtest-result .metric .label { display: block; font-size: 0.75em; text-transform: uppercase; color: #a0a0a0; margin-bottom: 3px; }
-        .backtest-result .metric .value { font-size: 1.2em; font-weight: 700; }
-        .backtest-result .metric .value.positive { color: #28a745; }
-        .backtest-result .metric .value.negative { color: #dc3545; }
-        .directional-results-table table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: center; }
-        .directional-results-table th, .directional-results-table td { padding: 6px; border: 1px solid #444; }
-        .directional-results-table th { background-color: #363636; font-size: 0.8em; text-transform: uppercase; color: #c0c0c0; }
-        .directional-results-table td { font-size: 0.95em; font-weight: 600; }
-        .directional-results-table .value.positive { color: #28a745; font-weight: 700; }
-        .directional-results-table .value.negative { color: #dc3545; font-weight: 700; }
-        .directional-results-table .fas { margin-right: 5px; }
+
+        /* Cores PNL */
+        .positive-pnl { color: #22c55e; } /* text-green-500 */
+        .negative-pnl { color: #ef4444; } /* text-red-500 */
+
+        .credential-fields { display: none; }
+
+        .toggle-indicator.open { transform: rotate(180deg); }
+
+
+        /* --- INÍCIO DA MODIFICAÇÃO (CSS para Novo Painel de Logs) --- */
+
+        /* Remove o sublinhado dos links do Tailwind dentro dos logs */
+        .log-window a { text-decoration: none; }
+
+        .log-window {
+            height: 24rem; /* h-96 */
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem; /* text-xs (12px) */
+            line-height: 1.4;
+            background-color: #020617; /* bg-black/50 -> slate-950 */
+            border-color: #334155; /* border-slate-700 */
+        }
+
+        .log-line {
+            display: flex;
+            align-items: flex-start;
+            padding: 4px 8px;
+            border-bottom: 1px solid #1e293b; /* border-slate-800 */
+            transition: background-color 0.15s ease-in-out;
+            word-break: break-all;
+        }
+        .log-line:hover {
+            background-color: #1e293b; /* bg-slate-800 */
+        }
+        .log-line.hidden {
+            display: none;
+        }
+
+        /* Cores e Ícones por Nível */
+        .log-icon {
+            flex-shrink: 0;
+            width: 1.1rem;
+            height: 1.1rem;
+            margin-right: 6px;
+            margin-top: 1px;
+        }
+
+        .log-line[data-level="INFO"] .log-icon { color: #3b82f6; } /* text-blue-500 */
+        .log-line[data-level="SUCCESS"] .log-icon { color: #22c55e; } /* text-green-500 */
+        .log-line[data-level="WARNING"] .log-icon { color: #eab308; } /* text-yellow-500 */
+        .log-line[data-level="ERROR"] .log-icon { color: #ef4444; } /* text-red-500 */
+        .log-line[data-level="DEBUG"] .log-icon { color: #a855f7; } /* text-purple-500 */
+
+        .log-timestamp {
+            flex-shrink: 0;
+            color: #64748b; /* text-slate-500 */
+            margin-right: 8px;
+        }
+
+        /* Badge de Conta */
+        .log-account-badge {
+            flex-shrink: 0;
+            font-size: 0.65rem; /* 10px */
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 99px; /* rounded-full */
+            margin-right: 8px;
+            margin-top: 2px;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        /* Mensagem */
+        .log-message {
+            color: #cbd5e1; /* text-slate-300 */
+            white-space: pre-wrap; /* Preserva newlines e espaços */
+        }
+        .log-line[data-level="WARNING"] .log-message { color: #fde047; } /* text-yellow-300 */
+        .log-line[data-level="ERROR"] .log-message { color: #f87171; } /* text-red-400 */
+        .log-line[data-level="SUCCESS"] .log-message { color: #86efac; } /* text-green-300 */
+
+        /* Highlight da busca */
+        .log-message mark {
+            background-color: #fde047; /* bg-yellow-300 */
+            color: #1e293b;
+            padding: 0 1px;
+            border-radius: 2px;
+        }
+
+        /* Toolbars */
+        .log-toolbar {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #334155; /* border-slate-700 */
+        }
+
+        /* Responsivo para toolbars */
+        @media (max-width: 768px) {
+            .log-toolbar {
+                grid-template-columns: 1fr; /* 1 coluna em mobile */
+            }
+        }
+
+        .log-toolbar-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem; /* gap-2 */
+            align-items: center;
+        }
+
+        /* Contadores de Stats */
+        .stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 99px; /* rounded-full */
+        }
+        .stat-badge-all { background-color: #475569; color: #f1f5f9; } /* bg-slate-600 text-slate-100 */
+        .stat-badge-info { background-color: #3b82f6; color: #fff; }
+        .stat-badge-success { background-color: #22c55e; color: #fff; }
+        .stat-badge-warning { background-color: #eab308; color: #1e293b; }
+        .stat-badge-error { background-color: #ef4444; color: #fff; }
+
+        /* Controles (Botões) */
+        .log-control-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem; /* gap-2 */
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background-color: #334155; /* bg-slate-700 */
+            border-radius: 0.375rem; /* rounded-md */
+            transition: background-color 0.15s;
+            cursor: pointer;
+        }
+        .log-control-btn:hover {
+            background-color: #475569; /* hover:bg-slate-600 */
+        }
+        .log-control-btn.active {
+            background-color: #22c55e; /* bg-green-500 */
+            color: #fff;
+        }
+        .log-control-btn.active:hover {
+            background-color: #16a34a; /* hover:bg-green-600 */
+        }
+        .log-control-btn svg {
+            width: 1rem; height: 1rem;
+        }
+
+        /* Inputs e Selects */
+        .log-filter-input {
+            width: 100%;
+            background-color: #1e293b; /* bg-slate-800 */
+            border: 1px solid #334155; /* border-slate-700 */
+            border-radius: 0.375rem; /* rounded-lg */
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+        .log-filter-input:focus {
+            outline: none;
+            border-color: #3b82f6; /* focus:border-blue-500 */
+        }
+
+        /* Animação de Status */
+        .status-indicator {
+            width: 0.75rem; height: 0.75rem;
+            border-radius: 99px;
+            background-color: #22c55e; /* bg-green-500 */
+        }
+        .status-indicator.paused {
+            background-color: #eab308; /* bg-yellow-500 */
+        }
+        .status-indicator.active {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        /* --- FIM DA MODIFICAÇÃO (CSS) --- */
+
     </style>
 </head>
-<body>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100 p-6">
+
     <div class="container">
-        <div class="header">
-            <img src="{{ url_for('static', filename='logoKBot.png') }}" alt="Logo" class="logo">
-            <h1></h1>
-            <div class="header-right-side">
-                <div class="donate-section">
-                    <strong><i class="fas fa-heart" style="color: #dc3545;"></i> Donate</strong>
-                    <div class="donate-address">
-                        <span>Sol: 4Lu4...FX9</span>
-                        <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('4Lu4D1yD78pLVvLf8gGgH7fS7t6kmjTaWaigy72HyFX9')"></i>
+
+        <div class="flex justify-between items-center mb-8 px-4 py-2">
+            <div class="flex items-center gap-3">
+                 <img src="{{ url_for('static', filename='logoKBot.png') }}" alt="Logo" class="logo h-8 w-auto">
+                 <h1></h1>
+            </div>
+
+            <div class="header-right-side flex items-center gap-6">
+                <div class="donate-section text-xs text-center">
+                    <strong class="text-white font-semibold flex items-center justify-center gap-1.5 mb-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-heart"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        Donate
+                    </strong>
+                    <div class="donate-address flex items-center justify-end gap-2">
+                        <span class="text-gray-400 font-mono">Sol: 4Lu4...FX9</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy text-blue-400 cursor-pointer" title="Copiar" onclick="copyToClipboard('4Lu4D1yD78pLVvLf8gGgH7fS7t6kmjTaWaigy72HyFX9')"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                     </div>
-                    <div class="donate-address">
-                        <span>EVM: 0x80...9E11</span>
-                        <i class="fas fa-copy copy-icon" title="Copiar" onclick="copyToClipboard('0x8084e7ba605ea5A802c12eF416bd571769769E11')"></i>
+                    <div class="donate-address flex items-center justify-end gap-2">
+                        <span class="text-gray-400 font-mono">EVM: 0x80...9E11</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy text-blue-400 cursor-pointer" title="Copiar" onclick="copyToClipboard('0x8084e7ba605ea5A802c12eF416bd571769769E11')"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                     </div>
                 </div>
 
-                <div class="version-info">
+                <div class="version-info text-xs text-right text-gray-400 flex flex-col items-end gap-1">
                     {% if version_info and not version_info.error %}
-                        <span class="version-text">Versão: {{ version_info.local_short }}</span>
+                        <span class="font-mono">Versão: {{ version_info.local_short }}</span>
                         {% if version_info.is_latest %}
-                            <span class="status-text positive"><i class="fas fa-check-circle"></i> Atualizado</span>
+                            <span class="text-green-400 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg> Atualizado</span>
                         {% else %}
-                            <a href="{{ version_info.repo_url }}" target="_blank" class="update-link">
-                                <span class="status-text warning"><i class="fas fa-arrow-alt-circle-up"></i> Nova versão disponível</span>
+                            <a href="{{ version_info.repo_url }}" target="_blank" class="text-yellow-400 flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg> Nova versão disponível
                             </a>
                         {% endif %}
                     {% elif version_info.error %}
-                         <span class="status-text warning" title="{{ version_info.error }}"><i class="fas fa-exclamation-triangle"></i> Verificação de Versão Indisponível</span>
+                         <span class="text-yellow-400 flex items-center gap-1" title="{{ version_info.error }}"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-triangle"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Verificação Indisponível</span>
                     {% endif %}
-                    <a href="https://github.com/kb9loso/KBot-Trading/tree/main/docs" target="_blank" class="docs-link" title="Ver Documentação"><i class="fas fa-book"></i>  Docs.</a>
+                    <a href="https://github.com/kb9loso/KBot-Trading/tree/main/docs" target="_blank" class="text-blue-400 font-semibold flex items-center gap-1" title="Ver Documentação">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        Docs.
+                    </a>
                 </div>
             </div>
         </div>
 
-        <div class="info-section">
-            <div class="section-header">
-                <h2>Contas Gerenciadas</h2>
-                <div class="header-actions">
-                    <form action="/start_all" method="post" style="margin:0;"><button type="submit" class="start-btn" title="Iniciar Todos os Bots"><i class="fas fa-play"></i> Iniciar Todos</button></form>
-                    <form action="/stop_all" method="post" style="margin:0;"><button type="submit" class="stop-btn" title="Parar Todos os Bots"><i class="fas fa-stop"></i> Parar Todos</button></form>
-                    <form action="/refresh_all" method="post" style="margin:0;"><button type="submit" class="refresh-btn" title="Atualizar Dados"><i class="fas fa-sync-alt"></i> Atualizar</button></form>
-                    <button class="add-btn" onclick="toggleAddAccountForm()" title="Adicionar Nova Conta"><i class="fa-solid fa-square-plus"></i> Nova Conta</button>
-                    <button class="notification-btn" onclick="toggleNotificationsForm()" title="Gerenciar Notificações"><i class="fas fa-bell"></i> Notificações</button>
+        <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
+             <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-5 h-5 text-blue-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                    Contas Gerenciadas
+                </h2>
+                <div class="flex flex-wrap gap-2">
+                    <form action="/start_all" method="post" style="margin:0;"><button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition flex items-center gap-2 text-sm" title="Iniciar Todos os Bots"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play w-4 h-4"><polygon points="5 3 19 12 5 21 5 3"/></svg> Iniciar Todos</button></form>
+                    <form action="/stop_all" method="post" style="margin:0;"><button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition flex items-center gap-2 text-sm" title="Parar Todos os Bots"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause w-4 h-4"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Parar Todos</button></form>
+                    <form action="/refresh_all" method="post" style="margin:0;"><button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2 text-sm" title="Atualizar Dados"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw w-4 h-4"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/></svg> Atualizar</button></form>
+                    <button class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition flex items-center gap-2 text-sm" onclick="toggleAddAccountForm()" title="Adicionar Nova Conta"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nova Conta</button>
+                    <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center gap-2 text-sm" onclick="toggleNotificationsForm()" title="Gerenciar Notificações"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell w-4 h-4"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Notificações</button>
                 </div>
             </div>
-             <div class="table-container">
-                <table>
+            <div class="overflow-x-auto">
+                <table class="w-full">
                     <thead>
-                        <tr>
-                            <th>Nome da Conta</th><th>Exchange</th><th>Chave Pública</th><th>Intervalo</th><th>Status</th><th class="action-column">Ação</th>
+                        <tr class="text-left text-sm text-gray-400 border-b border-slate-700">
+                            <th class="pb-3 px-3">Nome da Conta</th><th class="pb-3 px-3">Exchange</th><th class="pb-3 px-3">Chave Pública</th>
+                            <th class="pb-3 px-3">Intervalo</th><th class="pb-3 px-3">Status</th><th class="pb-3 px-3 text-right">Ação</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% if not accounts %}
+                            <tr><td colspan="6" class="text-center py-4 text-gray-400">Nenhuma conta cadastrada.</td></tr>
+                        {% endif %}
                         {% for account in accounts %}
-                        <tr>
-                            <td>{{ account.account_name }}</td>
-                            <td>{{ account.exchange_name | capitalize }}</td>
-                            <td>
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="py-3 px-3 font-semibold">{{ account.account_name }}</td>
+                            <td class="py-3 px-3 text-sm">{{ account.exchange_name | capitalize }}</td>
+                            <td class="py-3 px-3 text-sm text-gray-400">
                                 {% if account.exchange_name == 'pacifica' and account.main_public_key %}
                                     {{ account.main_public_key[:6] }}...{{ account.main_public_key[-4:] }}
                                 {% elif account.exchange_name == 'apex' and account.zk_l2key %}
@@ -177,22 +311,30 @@
                                     N/A
                                 {% endif %}
                             </td>
-                            <td>{{ account.check_interval_seconds }}s</td>
-                            <td><span class="status-text {{ 'positive' if account.account_name in running_bots else 'negative' }}">{{ 'Executando' if account.account_name in running_bots else 'Parado' }}</span></td>
-                            <td class="action-column">
-                                <div class="action-buttons-container">
+                            <td class="py-3 px-3 text-sm">{{ account.check_interval_seconds }}s</td>
+                            <td class="py-3 px-3">
+                                <span class="text-sm font-semibold px-3 py-1 rounded-full {{ 'text-green-400 bg-green-500/20' if account.account_name in running_bots else 'text-gray-400 bg-gray-500/20' }}">
+                                    {{ 'Executando' if account.account_name in running_bots else 'Pausado' }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3">
+                                <div class="flex gap-2 justify-end">
                                     {% if account.account_name in running_bots %}
-                                        <form action="/stop/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="stop-btn" title="Parar Bot"><i class="fa-solid fa-stop"></i></button></form>
+                                        <form action="/stop/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="p-2 bg-red-600/80 hover:bg-red-600 rounded-lg transition" title="Parar Bot"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause w-4 h-4"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></button></form>
                                     {% else %}
-                                        <form action="/start/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="start-btn" title="Iniciar Bot"><i class="fa-solid fa-play"></i></button></form>
+                                        <form action="/start/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;"><button type="submit" class="p-2 bg-green-600/80 hover:bg-green-600 rounded-lg transition" title="Iniciar Bot"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play w-4 h-4"><polygon points="5 3 19 12 5 21 5 3"/></svg></button></form>
                                     {% endif %}
-                                    <button type="button" class="edit-btn" title="Editar Conta" onclick='editAccount({{ account | tojson | safe }})'><i class="fas fa-pencil-alt"></i></button>
-                                    <form action="/delete_account/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;" onsubmit="return confirm('Remover esta conta e todos os setups?');"><button type="submit" class="delete-btn" title="Remover Conta"><i class="fas fa-trash-alt"></i></button></form>
+                                    <button type="button" class="p-2 bg-blue-600/80 hover:bg-blue-600 rounded-lg transition" title="Editar Conta" onclick='editAccount({{ account | tojson | safe }})'><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit w-4 h-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                                    <form action="/delete_account/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;" onsubmit="return confirm('Remover esta conta e todos os setups?');"><button type="submit" class="p-2 bg-orange-600/80 hover:bg-orange-600 rounded-lg transition" title="Remover Conta"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></form>
                                     <form action="/toggle_notifications/{{ account.exchange_name }}/{{ account.account_name }}" method="post" style="margin:0;">
-                                        <button type="submit" class="notification-toggle-btn"
+                                        <button type="submit" class="p-2 bg-indigo-600/80 hover:bg-indigo-600 rounded-lg transition"
                                                 title="{{ 'Desativar' if account.notifications_enabled else 'Ativar' }} notificações"
                                                 {{ 'disabled' if not telegram_config.enabled }}>
-                                            <i class="fas {{ 'fa-bell' if account.notifications_enabled else 'fa-bell-slash' }}"></i>
+                                            {% if account.notifications_enabled %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell w-4 h-4"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                                            {% else %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell-off w-4 h-4"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="m2 2 20 20"/></svg>
+                                            {% endif %}
                                         </button>
                                     </form>
                                 </div>
@@ -204,65 +346,81 @@
             </div>
         </div>
 
-        <div class="form-section" id="add-account-section" style="display: none;">
-            <h2 id="account-form-title">Adicionar Nova Conta</h2>
-            <form id="account-form" action="/manage_account" method="post" onsubmit="return validateAccountForm()">
+        <div class="form-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8" id="add-account-section" style="display: none;">
+            <h2 id="account-form-title" class="text-xl font-bold flex items-center gap-2 mb-6">Adicionar Nova Conta</h2>
+            <form id="account-form" action="/manage_account" method="post" onsubmit="return validateAccountForm()" class="space-y-6">
                 <input type="hidden" name="original_account_name" id="original_account_name">
-                <div class="form-row">
-                    <label title="Um nome único para identificar esta conta no painel.">Nome da Conta<input type="text" name="account_name" required></label>
-                    <label title="A corretora onde esta conta será usada.">Exchange
-                        <select name="exchange_name" required onchange="toggleCredentialFields(this.value)">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label title="Um nome único para identificar esta conta no painel." class="block">
+                        <span class="block text-sm font-medium text-gray-300 mb-2">Nome da Conta</span>
+                        <input type="text" name="account_name" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                    </label>
+                    <label title="A corretora onde esta conta será usada." class="block">
+                        <span class="block text-sm font-medium text-gray-300 mb-2">Exchange</span>
+                        <select name="exchange_name" required onchange="toggleCredentialFields(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                             {% for ex_name in exchanges_allowed %}
                             <option value="{{ ex_name }}">{{ ex_name | capitalize }}</option>
                             {% endfor %}
                         </select>
                     </label>
-                    <label title="O intervalo em segundos que o bot aguardará entre cada verificação de sinais de trading.">Intervalo (s)<input type="number" name="check_interval" value="180" class="value-input" required></label>
+                    <label title="O intervalo em segundos que o bot aguardará entre cada verificação de sinais de trading." class="block">
+                        <span class="block text-sm font-medium text-gray-300 mb-2">Intervalo (s)</span>
+                        <input type="number" name="check_interval" value="180" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                    </label>
                 </div>
-                <div id="pacifica-fields" class="credential-fields">
-                    <div class="form-row"><label title="A chave de API pública da sua conta na exchange." style="flex-grow: 1;">Chave Pública<input type="text" name="main_public_key" class="pacifica-required"></label></div>
-                    <div class="form-row"><label title="A chave de API privada (secret key) da sua conta na exchange." style="flex-grow: 1;">Chave Privada do Agente<input type="password" name="agent_private_key" class="pacifica-required"></label></div>
+                <div id="pacifica-fields" class="credential-fields space-y-4">
+                    <label title="A chave de API pública da sua conta na exchange." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">Chave Pública</span><input type="text" name="main_public_key" class="pacifica-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
+                    <label title="A chave de API privada (secret key) da sua conta na exchange." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">Chave Privada do Agente</span><input type="password" name="agent_private_key" class="pacifica-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
                 </div>
-                <div id="apex-fields" class="credential-fields" style="display: none;">
-                    <div class="form-row"><label title="Sua API Key da Apex." style="flex-grow: 1;">API Key<input type="text" name="api_key" class="apex-required"></label></div>
-                    <div class="form-row"><label title="Seu API Secret da Apex." style="flex-grow: 1;">API Secret<input type="password" name="api_secret" class="apex-required"></label></div>
-                    <div class="form-row"><label title="Sua API Passphrase da Apex." style="flex-grow: 1;">API Passphrase<input type="password" name="passphrase" class="apex-required"></label></div>
-                    <div class="form-row"><label title="Sua ZK Seed da Apex." style="flex-grow: 1;">ZK Seeds<input type="password" name="zk_seeds" class="apex-required"></label></div>
-                    <div class="form-row"><label title="Sua ZK L2 Key da Apex." style="flex-grow: 1;">ZK L2 Key<input type="password" name="zk_l2key" class="apex-required"></label></div>
+                <div id="apex-fields" class="credential-fields space-y-4">
+                    <label title="Sua API Key da Apex." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">API Key</span><input type="text" name="api_key" class="apex-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
+                    <label title="Seu API Secret da Apex." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">API Secret</span><input type="password" name="api_secret" class="apex-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
+                    <label title="Sua API Passphrase da Apex." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">API Passphrase</span><input type="password" name="passphrase" class="apex-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
+                    <label title="Sua ZK Seed da Apex." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">ZK Seeds</span><input type="password" name="zk_seeds" class="apex-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
+                    <label title="Sua ZK L2 Key da Apex." class="block"><span class="block text-sm font-medium text-gray-300 mb-2">ZK L2 Key</span><input type="password" name="zk_l2key" class="apex-required w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"></label>
                 </div>
-                <div class="form-row">
-                    <button type="submit" class="add-btn">Salvar Conta</button>
-                    <button type="button" class="stop-btn" onclick="toggleAddAccountForm()">Cancelar</button>
+                <div class="flex gap-3 justify-end pt-4 border-t border-slate-700">
+                    <button type="button" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" onclick="toggleAddAccountForm()">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">Salvar Conta</button>
                 </div>
             </form>
         </div>
 
-        <div class="form-section" id="notifications-section" style="display: none;">
-            <h2>Gerenciar Notificações do Telegram</h2>
-            <form action="/save_telegram_settings" method="post">
-                <div class="form-row">
-                    <label title="Token do seu bot do Telegram, obtido com o @BotFather.">Token do Bot<input type="text" name="telegram_bot_token" value="{{ telegram_config.bot_token or '' }}"></label>
-                    <label title="ID do chat para onde as notificações serão enviadas.">Chat ID<input type="text" name="telegram_chat_id" value="{{ telegram_config.chat_id or '' }}"></label>
+        <div class="form-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8" id="notifications-section" style="display: none;">
+            <h2 class="text-xl font-bold flex items-center gap-2 mb-6">Gerenciar Notificações do Telegram</h2>
+            <form action="/save_telegram_settings" method="post" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label title="Token do seu bot do Telegram, obtido com o @BotFather." class="block">
+                        <span class="block text-sm font-medium text-gray-300 mb-2">Token do Bot</span>
+                        <input type="text" name="telegram_bot_token" value="{{ telegram_config.bot_token or '' }}" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                    </label>
+                    <label title="ID do chat para onde as notificações serão enviadas." class="block">
+                        <span class="block text-sm font-medium text-gray-300 mb-2">Chat ID</span>
+                        <input type="text" name="telegram_chat_id" value="{{ telegram_config.chat_id or '' }}" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                    </label>
                 </div>
-                <div class="form-row">
-                    <label title="Notificar no Telegram quando uma posição for aberta." style="flex-direction: row; align-items: center; gap: 8px;"><input type="checkbox" name="notify_on_open" value="true" {{ 'checked' if telegram_config.get('notify_on_open') }}>Notificar Abertura</label>
-                    <label title="Notificar no Telegram quando uma posição for fechada." style="flex-direction: row; align-items: center; gap: 8px;"><input type="checkbox" name="notify_on_close" value="true" {{ 'checked' if telegram_config.get('notify_on_close') }}>Notificar Fechamento</label>
+                <div class="flex gap-6">
+                    <label title="Notificar no Telegram quando uma posição for aberta." class="flex items-center gap-2 text-sm font-medium text-gray-300"><input type="checkbox" name="notify_on_open" value="true" {{ 'checked' if telegram_config.get('notify_on_open') }} class="bg-slate-700 border-slate-600 rounded focus:ring-blue-500">Notificar Abertura</label>
+                    <label title="Notificar no Telegram quando uma posição for fechada." class="flex items-center gap-2 text-sm font-medium text-gray-300"><input type="checkbox" name="notify_on_close" value="true" {{ 'checked' if telegram_config.get('notify_on_close') }} class="bg-slate-700 border-slate-600 rounded focus:ring-blue-500">Notificar Fechamento</label>
                 </div>
-                <div class="form-row">
-                    <button type="submit" class="add-btn">Salvar Configurações</button>
-                    <button type="button" class="stop-btn" onclick="toggleNotificationsForm()">Cancelar</button>
+                <div class="flex gap-3 justify-end pt-4 border-t border-slate-700">
+                    <button type="button" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" onclick="toggleNotificationsForm()">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">Salvar Configurações</button>
                 </div>
             </form>
         </div>
 
         {% if accounts %}
-            <div class="info-section">
-                <div class="section-header">
-                    <h2>Visão Geral</h2>
-                    <form id="account-filter-form" action="{{ url_for('index') }}" method="get" style="margin-left: auto;">
-                        <label style="flex-direction: row; align-items: center; gap: 8px; font-weight: normal;">
-                            Exibir dados para:
-                            <select name="account" onchange="this.form.submit()">
+            <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity w-5 h-5 text-purple-400"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        Visão Geral
+                    </h2>
+                    <form id="account-filter-form" action="{{ url_for('index') }}" method="get" style="margin:0;">
+                        <label class="flex items-center gap-3">
+                            <span class="text-sm text-gray-400">Exibir dados para:</span>
+                            <select name="account" onchange="this.form.submit()" class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-slate-600">
                                 <option value="all" {% if selected_account_filter == 'all' %}selected{% endif %}>Todas as Contas</option>
                                 {% for acc in accounts %}
                                     <option value="{{ acc.account_name }}" {% if selected_account_filter == acc.account_name %}selected{% endif %}>
@@ -273,179 +431,325 @@
                         </label>
                     </form>
                 </div>
-
-                <div class="account-info" style="margin-top: 15px;">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {% if account_info and account_info.account_equity is defined %}
                         {% if volume_7d is defined and volume_7d > 0 %}
-                        <div class="metric-card">
-                            <i class="fas fa-sync-alt metric-icon"></i> <div class="metric-text">
-                                <strong>VOLUME (7D)</strong> <span>${{ "%.2f"|format(volume_7d|float) }}</span> </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">VOLUME (7D)</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw w-5 h-5 text-gray-400"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/></svg></div>
+                            <div class="text-3xl font-bold">${{ "%.2f"|format(volume_7d|float) }}</div>
                         </div>
                         {% endif %}
-                        <div class="metric-card"><i class="fas fa-chart-line metric-icon"></i><div class="metric-text"><strong>PATRIMÔNIO</strong><span>${{ "%.2f"|format(account_info.account_equity|float) }}</span></div></div>
-                        <div class="metric-card clickable-card" onclick="togglePositionsTable()">
-                            <i class="fas fa-box-open metric-icon"></i>
-                            <div class="metric-text"><strong>POSIÇÕES</strong><span>{{ open_positions_details | length }}</span></div>
-                            <i class="fas fa-chevron-down toggle-indicator" id="positions-toggle-icon"></i>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">PATRIMÔNIO</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up w-5 h-5 text-gray-400"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+                            <div class="text-3xl font-bold">${{ "%.2f"|format(account_info.account_equity|float) }}</div>
                         </div>
-                        <div class="metric-card"><i class="fas fa-hand-holding-usd metric-icon"></i><div class="metric-text"><strong>DISPONÍVEL</strong><span>${{ "%.2f"|format(account_info.available_to_spend|float) }}</span></div></div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 cursor-pointer" onclick="togglePositionsTable()">
+                            <div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">POSIÇÕES</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box w-5 h-5 text-gray-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg></div>
+                            <div class="flex items-center justify-between"><span class="text-3xl font-bold">{{ open_positions_details | length }}</span><svg id="positions-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down w-5 h-5 text-gray-400 toggle-indicator transition-transform duration-200"><path d="m6 9 6 6 6-6"/></svg></div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">DISPONÍVEL</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-dollar-sign w-5 h-5 text-gray-400"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                            <div class="text-3xl font-bold">${{ "%.2f"|format(account_info.available_to_spend|float) }}</div>
+                        </div>
                     {% else %}
-                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Clique em "Atualizar Dados" para carregar as informações.</div>
+                        <div class="col-span-full text-center text-gray-400 py-4">Clique em "Atualizar Dados" para carregar as informações.</div>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="info-section" id="positions-section" style="display: none;">
-                <h2>Posições Abertas</h2>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th>Conta</th><th>Ativo</th><th>Lado</th><th>Quantidade</th><th>Preço Entrada</th><th>Preço Atual</th><th>% PnL</th><th>SL / TP</th><th>Data Criação (UTC)</th></tr></thead>
+            <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8" id="positions-section" style="display: none;">
+                 <h2 class="text-xl font-bold flex items-center gap-2 mb-6">Posições Abertas</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-sm text-gray-400 border-b border-slate-700">
+                                <th class="pb-3 px-3">Conta</th><th class="pb-3 px-3">Ativo</th><th class="pb-3 px-3">Lado</th><th class="pb-3 px-3">Quantidade</th>
+                                <th class="pb-3 px-3">Preço Entrada</th><th class="pb-3 px-3">Preço Atual</th><th class="pb-3 px-3">% PnL</th>
+                                <th class="pb-3 px-3">SL / TP</th><th class="pb-3 px-3">Data Criação (UTC)</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for pos in open_positions_details %}
-                            <tr>
-                                <td>{{ pos.account_name }}</td><td>{{ pos.symbol }}</td>
-                                <td><span class="{{ 'positive-pnl' if pos.side == 'bid' else 'negative-pnl' }}">{{ 'Long' if pos.side == 'bid' else 'Short' }}</span></td>
-                                <td>{{ pos.amount | float }}</td><td>${{ pos.entry_price|float }}</td><td>${{ pos.current_price|float }}</td>
-                                <td class="{{ 'positive-pnl' if pos.pnl_percentage >= 0 else 'negative-pnl' }}">{{ "%+.2f"|format(pos.pnl_percentage) }}%</td>
-                                <td>${{ pos.sl_price|float if pos.sl_price != 'N/A' else '-' }} / ${{ pos.tp_price|float if pos.tp_price != 'N/A' else '-' }}</td>
-                                <td>{{ pos.creation_date_utc }}</td>
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                <td class="py-3 px-3">{{ pos.account_name }}</td><td class="py-3 px-3">{{ pos.symbol }}</td>
+                                <td class="py-3 px-3"><span class="{{ 'text-green-400' if pos.side == 'bid' else 'text-red-400' }}">{{ 'Long' if pos.side == 'bid' else 'Short' }}</span></td>
+                                <td class="py-3 px-3">{{ pos.amount | float }}</td><td class="py-3 px-3">${{ pos.entry_price|float }}</td><td class="py-3 px-3">${{ pos.current_price|float }}</td>
+                                <td class="py-3 px-3 {{ 'text-green-400' if pos.pnl_percentage >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(pos.pnl_percentage) }}%</td>
+                                <td class="py-3 px-3">${{ pos.sl_price|float if pos.sl_price != 'N/A' else '-' }} / ${{ pos.tp_price|float if pos.tp_price != 'N/A' else '-' }}</td>
+                                <td class="py-3 px-3">{{ pos.creation_date_utc }}</td>
                             </tr>
-                            {% else %}<tr><td colspan="9" style="text-align: center;">Nenhuma posição aberta.</td></tr>{% endfor %}
+                            {% else %}<tr><td colspan="9" class="text-center py-4 text-gray-400">Nenhuma posição aberta.</td></tr>{% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="info-section">
-                <h2>Performance (Últimos 30 Dias)</h2>
-                <div class="dashboard-metrics">
+            <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
+                <h2 class="text-xl font-bold flex items-center gap-2 mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-5 h-5 text-green-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                    Performance (Últimos 30 Dias)
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     {% if dashboard and dashboard.total_trades > 0 %}
-                        <div class="metric-card"><i class="fas fa-dollar-sign metric-icon"></i><div class="metric-text"><strong>PnL Total</strong><span class="{{ 'positive' if dashboard.total_pnl >= 0 else 'negative' }}">${{ "%.2f"|format(dashboard.total_pnl) }}</span></div></div>
-                        <div class="metric-card"><i class="fas fa-exchange-alt metric-icon"></i><div class="metric-text"><strong>Trades</strong><span>{{ dashboard.total_trades }}</span></div></div>
-                        <div class="metric-card"><i class="fas fa-bullseye metric-icon"></i><div class="metric-text"><strong>Acerto</strong><span>{{ "%.1f"|format(dashboard.win_rate) }}%</span></div></div>
-                        <div class="metric-card"><i class="fas fa-arrow-up metric-icon" style="color: #28a745;"></i><div class="metric-text"><strong>Ganho Médio</strong><span class="positive">${{ "%.2f"|format(dashboard.avg_win) }}</span></div></div>
-                        <div class="metric-card"><i class="fas fa-arrow-down metric-icon" style="color: #dc3545;"></i><div class="metric-text"><strong>Perda Média</strong><span class="negative">${{ "%.2f"|format(dashboard.avg_loss) }}</span></div></div>
-                        <div class="metric-card"><i class="fas fa-receipt metric-icon"></i><div class="metric-text"><strong>Taxas</strong><span>${{ "%.2f"|format(dashboard.total_fees) }}</span></div></div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-dollar-sign w-6 h-6 {{ 'text-green-400' if dashboard.total_pnl >= 0 else 'text-red-400' }}"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span class="text-sm text-gray-400">PNL TOTAL</span></div>
+                            <div class="text-2xl font-bold {{ 'text-green-400' if dashboard.total_pnl >= 0 else 'text-red-400' }}">${{ "%.2f"|format(dashboard.total_pnl) }}</div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw w-6 h-6 text-blue-400"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/></svg><span class="text-sm text-gray-400">TRADES</span></div>
+                            <div class="text-2xl font-bold">{{ dashboard.total_trades }}</div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-6 h-6 text-purple-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg><span class="text-sm text-gray-400">ACERTO</span></div>
+                            <div class="text-2xl font-bold">{{ "%.1f"|format(dashboard.win_rate) }}%</div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up w-6 h-6 text-green-400"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="text-sm text-gray-400">GANHO MÉDIO</span></div>
+                            <div class="text-2xl font-bold text-green-400">${{ "%.2f"|format(dashboard.avg_win) }}</div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-down w-6 h-6 text-red-400"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg><span class="text-sm text-gray-400">PERDA MÉDIA</span></div>
+                            <div class="text-2xl font-bold text-red-400">${{ "%.2f"|format(dashboard.avg_loss) }}</div>
+                        </div>
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle w-6 h-6 text-yellow-400"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span class="text-sm text-gray-400">TAXAS</span></div>
+                            <div class="text-2xl font-bold">${{ "%.2f"|format(dashboard.total_fees) }}</div>
+                        </div>
                     {% else %}
-                        <div style="grid-column: 1 / -1; text-align:center; padding: 20px;">Nenhum histórico de trades encontrado.</div>
+                        <div class="col-span-full text-center text-gray-400 py-4">Nenhum histórico de trades encontrado.</div>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="info-section">
-                <h2>Setups Ativos</h2>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th>Conta</th><th>Ativo</th><th>Estratégia</th><th>Alav.</th><th>Risco/Trade</th><th>Stop Loss</th><th>Take Profit</th><th>Modo Saída</th><th>Direção</th><th>Trailing Stop</th><th class="action-column">Ação</th></tr></thead>
-                        <tbody>
-                            {% for market in setups_to_display %}
-                            <tr>
-                                <td>{{ market.account_name }}</td>
-                                <td>
-                                    <div class="asset-cell-container"><i class="fas fa-circle status-icon {{ 'open' if market.base_currency in open_positions_by_account.get(market.account_name, []) else 'idle' }}"></i><span>{{ market.base_currency }}</span></div>
-                                </td>
-                                <td>{{ market.strategy_name }}</td><td>{{ market.leverage }}x</td>
-                                <td>{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>
-                                <td>{{ "%.2f"|format(market.stop_loss_config.value * 100) ~ '%' if market.stop_loss_config.type == 'percentage' else market.stop_loss_config.value ~ 'x ATR' }}</td>
-                                <td>{{ market.take_profit_rrr }}:1 RRR</td><td>{{ market.exit_mode | capitalize }}</td>
-                                <td>
-                                    {{ 'Long & Short' if market.direction_mode == 'long_short'
-                                    else 'Long Only' if market.direction_mode == 'long_only'
-                                    else 'Short Only' if market.direction_mode == 'short_only'
-                                    else 'BTC Trend' }}
-                                </td>
-                                <td>
-                                    {% set tsl = market.trailing_stop_config %}
-                                    {% if tsl and tsl.type != 'none' %}
-                                        {% if tsl.type == 'breakeven' %}
-                                            BEP ({{ "%.1f"|format(tsl.breakeven_trigger_rrr) }} RRR)
-                                        {% else %}
-                                            {{ tsl.type|upper }}
-                                        {% endif %}
-                                    {% else %}
-                                        Nenhum
+            <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks w-5 h-5 text-purple-400"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+                        Setups Ativos
+                    </h2>
+                    <button onclick="showSetupForm(null)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Adicionar Setup
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    {% if not accounts %}
+                        <div class="text-center text-gray-400 py-4">Nenhuma conta cadastrada.</div>
+                    {% endif %}
+
+                    {% for account in accounts %}
+                        {% set account_id_safe = account.account_name | replace(' ', '-') | lower %}
+
+                        {% set total_setup_count = namespace(value=0) %}
+                        {% set open_position_setup_count = namespace(value=0) %}
+                        {% set account_open_positions = open_positions_by_account.get(account.account_name, []) %}
+
+                        {% for market in setups_to_display if market.account_name == account.account_name %}
+                            {% set total_setup_count.value = total_setup_count.value + 1 %}
+                            {# Verifica se o base_currency deste setup está na lista de ativos com posição aberta para esta conta #}
+                            {% if market.base_currency in account_open_positions %}
+                                {% set open_position_setup_count.value = open_position_setup_count.value + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        <button
+                            onclick="toggleSetups('setups-content-{{ account_id_safe }}', 'setups-icon-{{ account_id_safe }}')"
+                            class="w-full flex items-center justify-between bg-slate-700/50 px-4 py-3 rounded-lg hover:bg-slate-700/70 transition"
+                        >
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="font-bold text-lg">{{ account.account_name }}</span>
+                                <span class="text-sm text-gray-400 px-2 py-1 bg-slate-800 rounded">
+                                    {{ total_setup_count.value }} Setups
+                                </span>
+                                <span class="text-sm font-semibold px-2 py-1 rounded {{ 'bg-green-500/20 text-green-400' if open_position_setup_count.value > 0 else 'bg-gray-500/20 text-gray-400' }}">
+                                    {{ open_position_setup_count.value }} Posições Abertas
+                                </span>
+                            </div>
+                            <svg id="setups-icon-{{ account_id_safe }}" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up w-5 h-5 transition-transform duration-200"><path d="m18 15-6-6-6 6"/></svg>
+                        </button>
+
+                        <div id="setups-content-{{ account_id_safe }}" class="overflow-x-auto p-0 transition-all duration-300" style="display: none;"> {# Começa escondido com style.display #}
+                            <table class="w-full">
+                                <thead>
+                                   <tr class="text-left text-xs text-gray-400 border-b border-slate-700">
+                                        <th class="pb-3 px-3">Ativo</th>
+                                        <th class="pb-3 px-3">Estratégia</th>
+                                        <th class="pb-3 px-3">Alav.</th>
+                                        <th class="pb-3 px-3">Risco/Trade</th>
+                                        <th class="pb-3 px-3">Stop Loss</th>
+                                        <th class="pb-3 px-3">Take Profit</th>
+                                        <th class="pb-3 px-3">Modo Saída</th>
+                                        <th class="pb-3 px-3">Direção</th>
+                                        <th class="pb-3 px-3">Trailing</th>
+                                        <th class="pb-3 px-3 text-right">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if total_setup_count.value == 0 %}
+                                        <tr><td colspan="10" class="text-center py-4 text-gray-400">Nenhum setup cadastrado para este bot.</td></tr>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <div class="action-buttons-container">
-                                        <button type="button" class="edit-btn" title="Editar Setup" onclick='editSetup({{ market | tojson | safe }})'><i class="fas fa-pencil-alt"></i></button>
-                                        <form action="/delete_market/{{ market.account_name }}/{{ market.id }}" method="post" style="margin:0;" onsubmit="return confirm('Remover este setup?');"><button type="submit" class="delete-btn" title="Remover Setup"><i class="fas fa-trash-alt"></i></button></form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+                                    {% for market in setups_to_display if market.account_name == account.account_name %}
+                                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                                        <td class="py-3 px-3">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full {{ 'bg-green-400' if market.base_currency in account_open_positions else 'bg-gray-400' }}"></span>
+                                                <span class="font-semibold">{{ market.base_currency }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 px-3 text-sm">{{ market.strategy_name }}</td>
+                                        <td class="py-3 px-3 text-sm">{{ market.leverage }}x</td>
+                                        <td class="py-3 px-3 text-sm">{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>
+                                        <td class="py-3 px-3 text-sm">{{ "%.2f"|format(market.stop_loss_config.value * 100) ~ '%' if market.stop_loss_config.type == 'percentage' else market.stop_loss_config.value ~ 'x ATR' }}</td>
+                                        <td class="py-3 px-3 text-sm">{{ market.take_profit_rrr }}:1 RRR</td>
+                                        <td class="py-3 px-3 text-sm">
+                                            <span class="text-xs px-2 py-1 rounded {{ 'bg-green-500/20 text-green-400' if market.exit_mode == 'ativo' else 'bg-gray-500/20 text-gray-400' }}">
+                                                {{ market.exit_mode | capitalize }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-3 text-sm">
+                                            {{ 'Long & Short' if market.direction_mode == 'long_short'
+                                            else 'Long Only' if market.direction_mode == 'long_only'
+                                            else 'Short Only' if market.direction_mode == 'short_only'
+                                            else 'BTC Trend' }}
+                                        </td>
+                                        <td class="py-3 px-3 text-sm">
+                                            {% set tsl = market.trailing_stop_config %}
+                                            {% if tsl and tsl.type != 'none' %}
+                                                {% if tsl.type == 'breakeven' %}
+                                                    BEP ({{ "%.1f"|format(tsl.breakeven_trigger_rrr) }} RRR)
+                                                {% else %}
+                                                    {{ tsl.type|upper }}
+                                                {% endif %}
+                                            {% else %}
+                                                Nenhum
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3 px-3">
+                                            <div class="flex gap-1 justify-end">
+                                                <button type="button" class="p-1.5 bg-slate-600 hover:bg-slate-500 rounded transition" title="Editar Setup" onclick='showSetupForm({{ market | tojson | safe }})'><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit w-3.5 h-3.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                                                <form action="/delete_market/{{ market.account_name }}/{{ market.id }}" method="post" style="margin:0;" onsubmit="return confirm('Remover este setup?');"><button type="submit" class="p-1.5 bg-red-600/80 hover:bg-red-600 rounded transition" title="Remover Setup"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 w-3.5 h-3.5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endfor %}
                 </div>
             </div>
 
-            <div class="form-section">
-                <h2>Adicionar/Atualizar Setup</h2>
-                <form id="setup-form" action="/process_setup_form" method="post">
-                    <div class="form-row">
-                        <label title="Selecione a conta de negociação para associar este setup.">Conta<select name="account_name" style="width: 220px;">{% for acc in accounts %}<option value="{{ acc.account_name }}">{{ acc.account_name }}</option>{% endfor %}</select></label>
-                        <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL).">Ativo<input type="text" name="base_currency" required style="width: 100px;"></label>
-                        <label title="Percentual do capital total da conta a ser arriscado em cada trade.">Risco (%)<input type="number" name="risk" value="1.0" step="0.1" required class="value-input"></label>
-                        <label title="Fator de multiplicação da sua posição (ex: 10x, 20x).">Alavancagem<input type="number" name="leverage" value="10" step="1" required class="value-input"></label>
-                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas.">Direção<select name="direction_mode" style="width: 150px;">
-                            <option value="long_short">Long & Short</option>
-                            <option value="long_only">Long Only</option>
-                            <option value="short_only">Short Only</option>
-                            <option value="btc_trend">BTC Trend</option>
-                        </select></label>
+            <div class="form-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8" id="add-setup-form-section" style="display: none;">
+                <h2 class="text-xl font-bold flex items-center gap-2 mb-6">Adicionar/Atualizar Setup</h2>
+                <form id="setup-form" action="/process_setup_form" method="post" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <label title="Selecione a conta de negociação para associar este setup." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Conta</span>
+                            <select name="account_name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                {% for acc in accounts %}<option value="{{ acc.account_name }}">{{ acc.account_name }}</option>{% endfor %}
+                            </select>
+                        </label>
+                        <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL)." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Ativo</span>
+                            <input type="text" name="base_currency" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                        </label>
+                        <label title="Percentual do capital total da conta a ser arriscado em cada trade." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Risco (%)</span>
+                            <input type="number" name="risk" value="1.0" step="0.1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                        </label>
+                        <label title="Fator de multiplicação da sua posição (ex: 10x, 20x)." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Alavancagem</span>
+                            <input type="number" name="leverage" value="10" step="1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                        </label>
+                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Direção</span>
+                            <select name="direction_mode" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                <option value="long_short">Long & Short</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option><option value="btc_trend">BTC Trend</option>
+                            </select>
+                        </label>
                     </div>
-                    <div class="form-row">
-                        <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações.">Estratégia<select name="strategy_name" style="width: 280px;">{% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}</select></label>
-                        <label title="O valor para o Stop Loss. Se o tipo for 'percentage', é a porcentagem do preço de entrada. Se for 'ATR', é o multiplicador do ATR.">Valor SL<input type="number" name="sl_value" value="2.0" step="0.1" required class="value-input"></label>
-                        <label title="A relação Risco/Retorno para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do stop loss.">TP (RRR)<input type="number" name="rrr" value="2.0" step="0.1" required class="value-input"></label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Estratégia</span>
+                            <select name="strategy_name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                {% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+                            </select>
+                        </label>
+                        <label title="O valor percentual para o Stop Loss." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Valor SL (%)</span>
+                            <input type="number" name="sl_value" value="2.0" step="0.01" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                        </label>
+                        <label title="A relação Risco/Retorno para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do stop loss." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">TP (RRR)</span>
+                            <input type="number" name="rrr" value="2.0" step="0.1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                        </label>
                     </div>
-                    <div class="form-row">
-                         <label title="'Passivo' usa apenas SL/TP. 'Ativo' permite que a estratégia feche a posição se o sinal reverter.">Modo Saída<select name="exit_mode" style="width: 120px;" onchange="toggleTslSection(this.value)"><option value="passivo">Passivo</option><option value="ativo">Ativo</option></select></label>
-                        <div id="tsl-section" style="display:none; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
-                            <label title="Um stop loss que se move a favor do preço para proteger os lucros.">Trailing Stop<select name="tsl_type" onchange="toggleTslOptions(this.value)" style="width: 180px;"><option value="none">Nenhum</option><option value="breakeven">Break-Even Point</option><option value="atr">ATR Trailing</option></select></label>
-                            <div id="tsl-breakeven-options" style="display:none;"><label title="(Breakeven) Relação Risco/Retorno que, ao ser atingida, move o Stop Loss para o preço de entrada.">Acionar em (RRR)<input type="number" name="tsl_breakeven_trigger" value="1.0" step="0.1" class="value-input"></label></div>
+                    <div class="flex flex-wrap items-end gap-4">
+                         <label title="'Passivo' usa apenas SL/TP. 'Ativo' permite que a estratégia feche a posição se o sinal reverter." class="block">
+                             <span class="block text-sm font-medium text-gray-300 mb-2">Modo Saída</span>
+                             <select name="exit_mode" onchange="toggleTslSection(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                <option value="passivo">Passivo</option><option value="ativo">Ativo</option>
+                            </select>
+                         </label>
+                        <div id="tsl-section" style="display:none;" class="flex flex-wrap items-end gap-4">
+                            <label title="Um stop loss que se move a favor do preço para proteger os lucros." class="block">
+                                <span class="block text-sm font-medium text-gray-300 mb-2">Trailing Stop</span>
+                                <select name="tsl_type" onchange="toggleTslOptions(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                    <option value="none">Nenhum</option><option value="breakeven">Break-Even Point</option><option value="atr">ATR Trailing</option>
+                                </select>
+                            </label>
+                            <div id="tsl-breakeven-options" style="display:none;" class="block">
+                                <label title="(Breakeven) Relação Risco/Retorno que, ao ser atingida, move o Stop Loss para o preço de entrada.">
+                                    <span class="block text-sm font-medium text-gray-300 mb-2">Acionar em (RRR)</span>
+                                    <input type="number" name="tsl_breakeven_trigger" value="1.0" step="0.1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                </label>
+                            </div>
                             <div id="tsl-atr-options" style="display:none;"></div>
-                            <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado."><input type="checkbox" name="remove_tp_on_trail" value="true">Remover TP</label>
+                            <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado." class="flex items-center gap-2 text-sm font-medium text-gray-300 pb-2">
+                                <input type="checkbox" name="remove_tp_on_trail" value="true" class="bg-slate-700 border-slate-600 rounded focus:ring-blue-500">Remover TP
+                            </label>
                         </div>
                     </div>
-                     <div class="form-row" style="margin-top: 10px;">
-                        <button type="submit" name="action" value="add_market" class="add-btn">Adicionar/Atualizar</button>
-                        <button type="submit" name="action" value="run_backtest" class="refresh-btn">Rodar Backtest</button>
+                     <div class="flex gap-3 justify-end pt-4 border-t border-slate-700">
+                        <button type="button" onclick="hideSetupForm()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Cancelar</button>
+                        <button type="submit" name="action" value="run_backtest" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">Rodar Backtest</button>
+                        <button type="submit" name="action" value="add_market" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">Adicionar/Atualizar</button>
                     </div>
                 </form>
 
                 {% if backtest_result and last_backtest_symbol and backtest_result.get(last_backtest_symbol) %}
                 {% set result = backtest_result[last_backtest_symbol] %}
-                <div class="backtest-result">
-                    <div class="result-header"><i class="fas fa-chart-bar metric-icon"></i><span>Melhor Resultado para <strong>{{ last_backtest_symbol }}</strong></span></div>
-                    <div class="result-body"><p><strong>Estratégia:</strong> {{ result['Estratégia'] }}</p><p><strong>Parâmetros:</strong> SL {{ result['Stop Loss %'] }} / TP {{ result['Take Profit RRR'] }}</p></div>
-                    <div class="result-metrics">
-                        <div class="metric"><span class="label">Trades</span><span class="value">{{ result['Total de Trades'] }}</span></div>
-                        <div class="metric"><span class="label">Retorno Total</span><span class="value {{ 'positive' if result['Retorno %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Retorno %']) }}%</span></div>
-                        <div class="metric"><span class="label">Acerto Total</span><span class="value">{{ "%.1f"|format(result['Taxa de Acerto %']) }}%</span></div>
+                <div class="backtest-result mt-6 border-t border-slate-700 pt-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart w-5 h-5 text-purple-400"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                        <span class="text-lg font-semibold">Melhor Resultado para <strong>{{ last_backtest_symbol }}</strong></span>
                     </div>
-                    <div class="directional-results-table">
-                        <table>
+                    <div class="text-sm text-gray-300 mb-4"><p><strong>Estratégia:</strong> {{ result['Estratégia'] }}</p><p><strong>Parâmetros:</strong> SL {{ result['Stop Loss %'] }} / TP {{ result['Take Profit RRR'] }}</p></div>
+                    <div class="grid grid-cols-3 gap-4 text-center mb-4">
+                        <div class="bg-slate-700 p-3 rounded-lg"><span class="block text-xs text-gray-400 uppercase">Trades</span><span class="text-xl font-bold">{{ result['Total de Trades'] }}</span></div>
+                        <div class="bg-slate-700 p-3 rounded-lg"><span class="block text-xs text-gray-400 uppercase">Retorno Total</span><span class="text-xl font-bold {{ 'text-green-400' if result['Retorno %'] >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(result['Retorno %']) }}%</span></div>
+                        <div class="bg-slate-700 p-3 rounded-lg"><span class="block text-xs text-gray-400 uppercase">Acerto Total</span><span class="text-xl font-bold">{{ "%.1f"|format(result['Taxa de Acerto %']) }}%</span></div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
                             <thead>
-                                <tr>
-                                    <th>Direção</th>
-                                    <th>Trades</th>
-                                    <th>Retorno</th>
-                                    <th>Acerto</th>
+                                <tr class="text-left text-sm text-gray-400 border-b border-slate-600">
+                                    <th class="pb-2 px-3">Direção</th><th class="pb-2 px-3">Trades</th><th class="pb-2 px-3">Retorno</th><th class="pb-2 px-3">Acerto</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td><i class="fas fa-arrow-trend-up positive-pnl"></i> Long</td>
-                                    <td>{{ result['Long Trades'] }}</td>
-                                    <td class="value {{ 'positive' if result['Long Return %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Long Return %']) }}%</td>
-                                    <td>{{ "%.1f"|format(result['Long Win Rate %']) }}%</td>
+                            <tbody class="text-sm">
+                                <tr class="border-b border-slate-700/50">
+                                    <td class="py-2 px-3 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up text-green-400"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Long</td>
+                                    <td class="py-2 px-3">{{ result['Long Trades'] }}</td>
+                                    <td class="py-2 px-3 font-semibold {{ 'text-green-400' if result['Long Return %'] >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(result['Long Return %']) }}%</td>
+                                    <td class="py-2 px-3">{{ "%.1f"|format(result['Long Win Rate %']) }}%</td>
                                 </tr>
                                 <tr>
-                                    <td><i class="fas fa-arrow-trend-down negative-pnl"></i> Short</td>
-                                    <td>{{ result['Short Trades'] }}</td>
-                                    <td class="value {{ 'positive' if result['Short Return %'] >= 0 else 'negative' }}">{{ "%+.2f"|format(result['Short Return %']) }}%</td>
-                                    <td>{{ "%.1f"|format(result['Short Win Rate %']) }}%</td>
+                                    <td class="py-2 px-3 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-down text-red-400"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Short</td>
+                                    <td class="py-2 px-3">{{ result['Short Trades'] }}</td>
+                                    <td class="py-2 px-3 font-semibold {{ 'text-green-400' if result['Short Return %'] >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(result['Short Return %']) }}%</td>
+                                    <td class="py-2 px-3">{{ "%.1f"|format(result['Short Win Rate %']) }}%</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -454,35 +758,557 @@
                 {% endif %}
             </div>
         {% else %}
-            <div class="info-section" style="text-align: center;"><h2>Nenhuma conta configurada</h2><p>Adicione uma conta para começar.</p></div>
+             <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8 text-center">
+                <h2 class="text-xl font-bold mb-2">Nenhuma conta configurada</h2>
+                <p class="text-gray-400">Adicione uma conta para começar.</p>
+            </div>
         {% endif %}
 
-        <div class="logs-section">
-            <div class="logs-header">
-                <h2>Logs</h2>
-                <form id="log-filter-form" action="{{ url_for('index') }}" method="get" class="log-filters">
-                    <select name="log_level" onchange="this.form.submit()">
-                        <option value="all" {% if selected_level == 'all' %}selected{% endif %}>Todos os Níveis</option>
-                        {% for level in log_levels %}<option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
-                    </select>
-                    <select name="log_account" onchange="this.form.submit()">
-                        <option value="all" {% if selected_account == 'all' %}selected{% endif %}>Todas as Contas</option>
-                        {% for acc in log_accounts %}<option value="{{ acc }}" {% if selected_account == acc %}selected{% endif %}>{{ acc }}</option>{% endfor %}
-                    </select>
-                </form>
-            </div>
-            <div class="logs" id="log-container">
-                {%- for log in logs|reverse -%}
-                    <div class="log-entry {{ log.level }}">
-                        [{{ log.timestamp }}] [{{ log.account }}] [{{ log.level }}] {% autoescape false %}{{ log.message }}{% endautoescape %}
+        <div class="logs-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
+            <h2 class="text-xl font-bold flex items-center gap-2 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                Logs em Tempo Real
+            </h2>
+
+            <div class="log-toolbar mb-4">
+                <div class="log-toolbar-section" id="log-stats-counters">
+                    <span class="stat-badge stat-badge-all" title="Total de logs">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                        <span id="log-count-all">0</span>
+                    </span>
+                    <span class="stat-badge stat-badge-info" title="Logs de Informação">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        <span id="log-count-info">0</span>
+                    </span>
+                    <span class="stat-badge stat-badge-success" title="Logs de Sucesso">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        <span id="log-count-success">0</span>
+                    </span>
+                    <span class="stat-badge stat-badge-warning" title="Logs de Aviso">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span id="log-count-warning">0</span>
+                    </span>
+                    <span class="stat-badge stat-badge-error" title="Logs de Erro">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        <span id="log-count-error">0</span>
+                    </span>
+                </div>
+
+                <div class="log-toolbar-section">
+                    <div class="relative w-full">
+                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                            <svg class="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </div>
+                        <input type="text" id="log-search-input" placeholder="Buscar nos logs..." class="log-filter-input pl-8">
                     </div>
-                {%- endfor -%}
+                    <select id="log-level-filter" class="log-filter-input flex-1">
+                        <option value="ALL">Nível: TODOS</option>
+                        <option value="INFO">Nível: INFO</option>
+                        <option value="SUCCESS">Nível: SUCCESS</option>
+                        <option value="WARNING">Nível: WARNING</option>
+                        <option value="ERROR">Nível: ERROR</option>
+                        <option value="DEBUG">Nível: DEBUG</option>
+                    </select>
+                    <select id="log-account-filter" class="log-filter-input flex-1">
+                        <option value="ALL">Conta: TODAS</option>
+                    </select>
+                </div>
+
+                <div class="log-toolbar-section justify-start md:justify-end">
+                    <button id="log-autoscroll-btn" class="log-control-btn active" title="Rolar Automaticamente">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                        <span>Auto-Scroll</span>
+                    </button>
+                    <button id="log-pause-btn" class="log-control-btn" title="Pausar/Retomar Logs">
+                        <svg id="log-pause-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        <svg id="log-play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span id="log-pause-text">Pausar</span>
+                    </button>
+                    <button id="log-copy-btn" class="log-control-btn" title="Copiar logs filtrados">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    <button id="log-download-btn" class="log-control-btn" title="Baixar logs filtrados (.txt)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button id="log-clear-btn" class="log-control-btn" title="Limpar logs da tela">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="log-window" class="log-window w-full overflow-y-auto rounded-lg p-2 border">
+                </div>
+
+            <div id="log-no-results" class="text-center py-10 text-slate-400" style="display: none;">
+                Nenhum log encontrado para os filtros aplicados.
+            </div>
+
+            <div class="flex justify-between items-center mt-3 text-sm text-slate-400">
+                <div class="flex items-center gap-2">
+                    <div id="log-status-indicator" class="status-indicator active"></div>
+                    <span id="log-status-text">Conectado. Aguardando logs...</span>
+                </div>
+                <div>
+                    Exibindo <strong id="log-count-showing" class="text-slate-200">0</strong> de <strong id="log-count-total" class="text-slate-200">0</strong> logs
+                </div>
             </div>
         </div>
-    </div>
+        </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- Estado Global dos Logs ---
+            let allLogs = [];
+            let filteredLogs = [];
+            let isPaused = false;
+            let isAutoScroll = true;
+            const accountColors = {};
+            const colorPalette = [
+                '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#64748b'
+            ];
+            let colorIndex = 0;
+
+            // --- Referências de DOM ---
+            const logWindow = document.getElementById('log-window');
+            const noResultsMsg = document.getElementById('log-no-results');
+            // Contadores
+            const countAll = document.getElementById('log-count-all');
+            const countInfo = document.getElementById('log-count-info');
+            const countSuccess = document.getElementById('log-count-success');
+            const countWarning = document.getElementById('log-count-warning');
+            const countError = document.getElementById('log-count-error');
+            // Filtros
+            const searchInput = document.getElementById('log-search-input');
+            const levelFilter = document.getElementById('log-level-filter');
+            const accountFilter = document.getElementById('log-account-filter');
+            // Controles
+            const autoScrollBtn = document.getElementById('log-autoscroll-btn');
+            const pauseBtn = document.getElementById('log-pause-btn');
+            const pauseIcon = document.getElementById('log-pause-icon');
+            const playIcon = document.getElementById('log-play-icon');
+            const pauseText = document.getElementById('log-pause-text');
+            const copyBtn = document.getElementById('log-copy-btn');
+            const downloadBtn = document.getElementById('log-download-btn');
+            const clearBtn = document.getElementById('log-clear-btn');
+            // Status Footer
+            const statusIndicator = document.getElementById('log-status-indicator');
+            const statusText = document.getElementById('log-status-text');
+            const countShowing = document.getElementById('log-count-showing');
+            const countTotal = document.getElementById('log-count-total');
+
+            // --- Conexão SocketIO ---
+            const socket = io();
+            socket.on('connect', () => {
+                console.log('Socket.IO Conectado!');
+                statusText.textContent = 'Conectado. Logs ativos.';
+                statusIndicator.classList.add('active');
+                statusIndicator.classList.remove('paused');
+            });
+
+            socket.on('disconnect', () => {
+                console.warn('Socket.IO Desconectado!');
+                statusText.textContent = 'Desconectado. Tentando reconectar...';
+                statusIndicator.classList.remove('active');
+                statusIndicator.classList.add('paused');
+            });
+
+            socket.on('new_log', (log) => {
+                allLogs.push(log);
+                updateAccountFilterOptions(log.account);
+
+                if (!isPaused) {
+                    // Otimização: Se não houver filtros, apenas anexe o log
+                    if (isLogVisible(log, searchInput.value, levelFilter.value, accountFilter.value)) {
+                        appendLogLine(log);
+                    } else {
+                        // Se estiver filtrado, precisa re-renderizar para atualizar contagens
+                        renderLogs();
+                    }
+                } else {
+                    // Se pausado, apenas atualiza contadores
+                    updateCounters();
+                    updateFooterStats();
+                }
+            });
+
+            // --- Funções Principais ---
+
+            /**
+             * Re-renderiza toda a janela de logs com base nos filtros.
+             * Chamado ao filtrar ou limpar.
+             */
+            function renderLogs() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const selectedLevel = levelFilter.value;
+                const selectedAccount = accountFilter.value;
+
+                filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
+
+                if (filteredLogs.length === 0 && allLogs.length > 0) {
+                    logWindow.innerHTML = '';
+                    logWindow.style.display = 'none';
+                    noResultsMsg.style.display = 'block';
+                } else if (filteredLogs.length === 0 && allLogs.length === 0) {
+                     logWindow.innerHTML = '';
+                     logWindow.style.display = 'block';
+                     noResultsMsg.style.display = 'none';
+                } else {
+                    logWindow.style.display = 'block';
+                    noResultsMsg.style.display = 'none';
+
+                    const fragment = document.createDocumentFragment();
+                    filteredLogs.forEach(log => {
+                        fragment.appendChild(createLogLineElement(log));
+                    });
+                    logWindow.innerHTML = ''; // Limpa a janela
+                    logWindow.appendChild(fragment); // Adiciona todos de uma vez
+                }
+
+                updateCounters();
+                updateFooterStats();
+                scrollToBottom();
+            }
+
+            /**
+             * Adiciona uma única linha de log ao final da janela.
+             * Mais eficiente do que re-renderizar tudo.
+             */
+            function appendLogLine(log) {
+                const searchTerm = searchInput.value.toLowerCase();
+
+                // Se a busca estiver ativa, precisamos destacar, então não podemos só anexar
+                if (searchTerm) {
+                    renderLogs();
+                    return;
+                }
+
+                logWindow.style.display = 'block';
+                noResultsMsg.style.display = 'none';
+
+                const logElement = createLogLineElement(log);
+                logWindow.appendChild(logElement);
+
+                updateCounters();
+                updateFooterStats();
+                scrollToBottom();
+            }
+
+            /**
+             * Cria o elemento DOM para uma única linha de log.
+             */
+            function createLogLineElement(log) {
+                const line = document.createElement('div');
+                line.className = 'log-line';
+                line.dataset.level = log.level;
+
+                const icon = getLevelIcon(log.level);
+                const timestamp = `<span class="log-timestamp">${log.timestamp}</span>`;
+                const badge = getAccountBadge(log.account);
+
+                // --- Mensagem e Highlight ---
+                const searchTerm = searchInput.value;
+                let message = log.is_html ? log.message : escapeHTML(log.message);
+
+                if (searchTerm && !log.is_html) {
+                    // Aplica highlight. 'gi' = global, insensitive
+                    const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
+                    message = message.replace(regex, '<mark>$&</mark>');
+                }
+
+                line.innerHTML = `${icon}${timestamp}${badge}<span class="log-message">${message}</span>`;
+                return line;
+            }
+
+            // --- Funções Auxiliares de UI ---
+
+            function updateCounters() {
+                let info = 0, success = 0, warning = 0, error = 0;
+                allLogs.forEach(log => {
+                    switch (log.level) {
+                        case 'INFO': info++; break;
+                        case 'SUCCESS': success++; break;
+                        case 'WARNING': warning++; break;
+                        case 'ERROR': error++; break;
+                    }
+                });
+                countAll.textContent = allLogs.length;
+                countInfo.textContent = info;
+                countSuccess.textContent = success;
+                countWarning.textContent = warning;
+                countError.textContent = error;
+            }
+
+            function updateFooterStats() {
+                countShowing.textContent = logWindow.childElementCount; // Contagem de elementos reais
+                countTotal.textContent = allLogs.length;
+            }
+
+            function scrollToBottom() {
+                if (isAutoScroll) {
+                    logWindow.scrollTop = logWindow.scrollHeight;
+                }
+            }
+
+            function getLevelIcon(level) {
+                let svg = '';
+                switch (level) {
+                    case 'INFO':
+                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+                        break;
+                    case 'SUCCESS':
+                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+                        break;
+                    case 'WARNING':
+                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+                        break;
+                    case 'ERROR':
+                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+                        break;
+                    default: // DEBUG e outros
+                        svg = '<svg class="log-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
+                }
+                return svg;
+            }
+
+            function getAccountBadge(account) {
+                if (!accountColors[account]) {
+                    accountColors[account] = colorPalette[colorIndex % colorPalette.length];
+                    colorIndex++;
+                }
+                const color = accountColors[account];
+                return `<span class="log-account-badge" style="background-color: ${color}">${escapeHTML(account)}</span>`;
+            }
+
+            function updateAccountFilterOptions(account) {
+                if (!accountColors[account]) { // A cor ser definida é o gatilho para "nova conta"
+                    const option = document.createElement('option');
+                    option.value = account;
+                    option.textContent = account;
+                    accountFilter.appendChild(option);
+                }
+            }
+
+            // --- Funções de Filtro ---
+
+            /**
+             * Verifica se um log deve ser visível com base nos filtros.
+             */
+            function isLogVisible(log, searchTerm, selectedLevel, selectedAccount) {
+                const levelMatch = selectedLevel === 'ALL' || log.level === selectedLevel;
+                const accountMatch = selectedAccount === 'ALL' || log.account === selectedAccount;
+                const searchMatch = !searchTerm ||
+                                    (log.message && log.message.toLowerCase().includes(searchTerm)) ||
+                                    (log.account && log.account.toLowerCase().includes(searchTerm));
+                return levelMatch && accountMatch && searchMatch;
+            }
+
+            // --- Funções de Controle ---
+
+            function toggleAutoScroll() {
+                isAutoScroll = !isAutoScroll;
+                autoScrollBtn.classList.toggle('active', isAutoScroll);
+                if (isAutoScroll) {
+                    scrollToBottom();
+                }
+            }
+
+            function togglePause() {
+                isPaused = !isPaused;
+                pauseBtn.classList.toggle('active', isPaused);
+                if (isPaused) {
+                    pauseText.textContent = 'Retomar';
+                    pauseIcon.style.display = 'none';
+                    playIcon.style.display = 'inline-block';
+                    statusText.textContent = 'Logs pausados.';
+                    statusIndicator.classList.remove('active');
+                    statusIndicator.classList.add('paused');
+                } else {
+                    pauseText.textContent = 'Pausar';
+                    pauseIcon.style.display = 'inline-block';
+                    playIcon.style.display = 'none';
+                    statusText.textContent = 'Conectado. Logs ativos.';
+                    statusIndicator.classList.add('active');
+                    statusIndicator.classList.remove('paused');
+                    // Re-renderiza para incluir logs perdidos
+                    renderLogs();
+                }
+            }
+
+            function clearLogs() {
+                if (confirm('Deseja limpar todos os logs da tela? (Isso não afeta os logs do servidor)')) {
+                    allLogs = [];
+                    filteredLogs = [];
+                    logWindow.innerHTML = '';
+                    // Resetar filtros de conta
+                    accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>';
+                    accountColors = {};
+                    colorIndex = 0;
+                    renderLogs();
+                }
+            }
+
+            /**
+             * Converte um log de objeto para texto plano.
+             */
+            function logToText(log) {
+                let message = log.message;
+                // Se for HTML (backtest), extrai o texto
+                if (log.is_html) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = message;
+                    message = tempDiv.textContent || tempDiv.innerText || '';
+                }
+                return `[${log.timestamp}] [${log.account}] [${log.level}] ${message}`;
+            }
+
+            function copyLogs() {
+                const logsToCopy = filteredLogs.map(logToText).join('\n');
+                navigator.clipboard.writeText(logsToCopy).then(() => {
+                    alert(`${filteredLogs.length} linhas de log copiadas!`);
+                }).catch(err => {
+                    console.error('Falha ao copiar logs: ', err);
+                });
+            }
+
+            function downloadLogs() {
+                const logsToDownload = filteredLogs.map(logToText).join('\n');
+                const blob = new Blob([logsToDownload], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/:/g, '-');
+                a.href = url;
+                a.download = `kbot-logs-${timestamp}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // --- Funções de Utilidade ---
+            function escapeHTML(str) {
+                if (typeof str !== 'string') return '';
+                return str.replace(/[&<>"']/g, (match) => {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
+                });
+            }
+
+            function escapeRegExp(string) {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& significa a string inteira
+            }
+
+            // --- Bind de Eventos ---
+            searchInput.addEventListener('input', renderLogs);
+            levelFilter.addEventListener('change', renderLogs);
+            accountFilter.addEventListener('change', renderLogs);
+
+            autoScrollBtn.addEventListener('click', toggleAutoScroll);
+            pauseBtn.addEventListener('click', togglePause);
+            clearBtn.addEventListener('click', clearLogs);
+            copyBtn.addEventListener('click', copyLogs);
+            downloadBtn.addEventListener('click', downloadLogs);
+
+            // Inicializa a UI
+            renderLogs();
+        });
+    </script>
+    <script>
         const exchangesData = {{ exchanges_data | tojson | safe }};
+
+        // --- JS PARA COLAPSAR SETUPS (CORRIGIDO) ---
+        function toggleSetups(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            if (content) {
+                 // Verifica usando style.display
+                if (content.style.display === 'none') {
+                    content.style.display = 'block'; // Mostra
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                } else {
+                    content.style.display = 'none'; // Esconde
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                }
+            }
+        }
+
+        // --- LÓGICA DO FORMULÁRIO DE SETUP (Mantida) ---
+        function resetSetupForm() {
+            const form = document.getElementById('setup-form');
+            if (!form) return;
+            form.reset();
+            // Define os valores padrão do formulário (para "Adicionar")
+            if(form.querySelector('[name="risk"]')) form.querySelector('[name="risk"]').value = "1.0";
+            if(form.querySelector('[name="leverage"]')) form.querySelector('[name="leverage"]').value = "10";
+            if(form.querySelector('[name="sl_value"]')) form.querySelector('[name="sl_value"]').value = "2.0";
+            if(form.querySelector('[name="rrr"]')) form.querySelector('[name="rrr"]').value = "2.0";
+            if(form.querySelector('[name="direction_mode"]')) form.querySelector('[name="direction_mode"]').value = "long_short";
+            if(form.querySelector('[name="exit_mode"]')) form.querySelector('[name="exit_mode"]').value = "passivo";
+            if(form.querySelector('[name="tsl_type"]')) form.querySelector('[name="tsl_type"]').value = "none";
+            // Reseta o TSL para o padrão
+            toggleTslSection('passivo');
+        }
+
+        function hideSetupForm() {
+            const section = document.getElementById('add-setup-form-section');
+            if (section) section.style.display = 'none';
+            resetSetupForm(); // Limpa o formulário ao fechar
+        }
+
+        function showSetupForm(setupData) {
+            const section = document.getElementById('add-setup-form-section');
+            const form = document.getElementById('setup-form');
+            if (!section || !form) return; // Sai se os elementos não existem
+
+            resetSetupForm(); // Começa limpando para os padrões
+
+            if (setupData) {
+                // MODO EDITAR: Preenche o formulário
+                form.querySelector('[name="account_name"]').value = setupData.account_name;
+                form.querySelector('[name="base_currency"]').value = setupData.base_currency;
+                form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
+                form.querySelector('[name="leverage"]').value = setupData.leverage;
+                form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
+                form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
+                form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
+
+                const slValueInput = form.querySelector('[name="sl_value"]');
+                slValueInput.value = (setupData.stop_loss_config.type === 'percentage') ? setupData.stop_loss_config.value * 100 : setupData.stop_loss_config.value;
+
+                const exitModeSelect = form.querySelector('[name="exit_mode"]');
+                exitModeSelect.value = setupData.exit_mode;
+                toggleTslSection(setupData.exit_mode); // Mostra/oculta TSL
+
+                const tslConfig = setupData.trailing_stop_config;
+                const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+                if (tslConfig && tslConfig.type !== 'none') {
+                    tslTypeSelect.value = tslConfig.type;
+                    if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) {
+                        form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
+                    }
+                    if (form.querySelector('[name="remove_tp_on_trail"]')) {
+                        form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
+                    }
+                } else if (tslTypeSelect) {
+                    tslTypeSelect.value = 'none';
+                }
+                toggleTslOptions(tslTypeSelect ? tslTypeSelect.value : 'none'); // Mostra/oculta opções de TSL
+
+            } else {
+                // MODO ADICIONAR: O formulário já foi resetado para os padrões
+                // Apenas garante que a primeira conta esteja selecionada, se houver
+                {% if accounts %}
+                if (form.querySelector('[name="account_name"]')) {
+                    form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}";
+                }
+                {% endif %}
+            }
+
+            section.style.display = 'block'; // Mostra o formulário
+            section.scrollIntoView({ behavior: 'smooth' }); // Rola até ele
+        }
+
+
+        // --- JS ORIGINAL (Quase todo mantido) ---
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
@@ -494,6 +1320,7 @@
 
         function validateAccountForm() {
             const form = document.getElementById('account-form');
+            if (!form) return false;
             const exchangeName = form.querySelector('[name="exchange_name"]').value;
             const originalAccountName = form.querySelector('[name="original_account_name"]').value;
             const exchange = exchangesData[exchangeName];
@@ -508,52 +1335,28 @@
 
         function toggleTslSection(exitMode) {
             const tslSection = document.getElementById('tsl-section');
+            if (!tslSection) return;
             if (exitMode === 'ativo') {
                 tslSection.style.display = 'flex';
             } else {
                 tslSection.style.display = 'none';
-                document.querySelector('select[name="tsl_type"]').value = 'none';
+                const tslTypeSelect = document.querySelector('select[name="tsl_type"]');
+                if (tslTypeSelect) tslTypeSelect.value = 'none';
                 toggleTslOptions('none');
             }
         }
 
         function toggleTslOptions(tslType) {
-            document.getElementById('tsl-breakeven-options').style.display = tslType === 'breakeven' ? 'flex' : 'none';
-            document.getElementById('tsl-atr-options').style.display = tslType === 'atr' ? 'flex' : 'none';
-        }
-
-        function editSetup(setupData) {
-            const form = document.getElementById('setup-form');
-            form.querySelector('[name="account_name"]').value = setupData.account_name;
-            form.querySelector('[name="base_currency"]').value = setupData.base_currency;
-            form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
-            form.querySelector('[name="leverage"]').value = setupData.leverage;
-            form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
-            form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
-            form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
-            const slValueInput = form.querySelector('[name="sl_value"]');
-            slValueInput.value = (setupData.stop_loss_config.type === 'percentage') ? setupData.stop_loss_config.value * 100 : setupData.stop_loss_config.value;
-            const exitModeSelect = form.querySelector('[name="exit_mode"]');
-            exitModeSelect.value = setupData.exit_mode;
-            toggleTslSection(setupData.exit_mode);
-            const tslConfig = setupData.trailing_stop_config;
-            const tslTypeSelect = form.querySelector('[name="tsl_type"]');
-            if (tslConfig && tslConfig.type !== 'none') {
-                tslTypeSelect.value = tslConfig.type;
-                if (tslConfig.type === 'breakeven') {
-                    form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
-                }
-                form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
-            } else {
-                tslTypeSelect.value = 'none';
-            }
-            toggleTslOptions(tslTypeSelect.value);
-            form.scrollIntoView({ behavior: 'smooth' });
+            const breakevenOptions = document.getElementById('tsl-breakeven-options');
+            const atrOptions = document.getElementById('tsl-atr-options');
+            if (breakevenOptions) breakevenOptions.style.display = tslType === 'breakeven' ? 'flex' : 'none';
+            if (atrOptions) atrOptions.style.display = tslType === 'atr' ? 'flex' : 'none';
         }
 
         function togglePositionsTable() {
             const section = document.getElementById('positions-section');
             const icon = document.getElementById('positions-toggle-icon');
+            if (!section || !icon) return;
             const isOpen = section.style.display === 'block';
             if (isOpen) {
                 section.style.display = 'none';
@@ -566,8 +1369,12 @@
 
         function toggleAddAccountForm(is_editing = false) {
             const section = document.getElementById('add-account-section');
+            if (!section) return;
             if (section.style.display === 'none' || is_editing) {
                 section.style.display = 'block';
+                if(is_editing) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
             } else {
                 section.style.display = 'none';
                 resetAccountForm();
@@ -576,6 +1383,7 @@
 
         function toggleNotificationsForm() {
             const section = document.getElementById('notifications-section');
+            if (!section) return;
             if (section.style.display === 'none') {
                 section.style.display = 'block';
             } else {
@@ -585,9 +1393,15 @@
 
         function resetAccountForm() {
             const form = document.getElementById('account-form');
+            if (!form) return;
             form.reset();
-            document.getElementById('account-form-title').innerText = 'Adicionar Nova Conta';
-            document.getElementById('original_account_name').value = '';
+            const title = document.getElementById('account-form-title');
+            if (title) title.innerText = 'Adicionar Nova Conta';
+            const originalNameInput = document.getElementById('original_account_name');
+            if (originalNameInput) originalNameInput.value = '';
+            // Reset fields visibility based on the first option in select
+            const exchangeSelect = form.querySelector('select[name="exchange_name"]');
+            if (exchangeSelect) toggleCredentialFields(exchangeSelect.value);
         }
 
         function toggleCredentialFields(exchangeName) {
@@ -595,50 +1409,74 @@
             const apexFields = document.getElementById('apex-fields');
             const pacificaInputs = document.querySelectorAll('.pacifica-required');
             const apexInputs = document.querySelectorAll('.apex-required');
-            if (exchangeName === 'pacifica') {
-                pacificaFields.style.display = 'block';
-                apexFields.style.display = 'none';
-                pacificaInputs.forEach(input => input.required = true);
-                apexInputs.forEach(input => input.required = false);
-            } else if (exchangeName === 'apex') {
-                pacificaFields.style.display = 'none';
-                apexFields.style.display = 'block';
-                pacificaInputs.forEach(input => input.required = false);
-                apexInputs.forEach(input => input.required = true);
-            }
+
+            if (pacificaFields) pacificaFields.style.display = exchangeName === 'pacifica' ? 'block' : 'none';
+            if (apexFields) apexFields.style.display = exchangeName === 'apex' ? 'block' : 'none';
+
+            pacificaInputs.forEach(input => input.required = (exchangeName === 'pacifica'));
+            apexInputs.forEach(input => input.required = (exchangeName === 'apex'));
         }
 
         function editAccount(accountData) {
             const form = document.getElementById('account-form');
+            if (!form) return;
             const exchangeSelect = form.querySelector('[name="exchange_name"]');
-            document.getElementById('account-form-title').innerText = 'Editar Conta: ' + accountData.account_name;
+            const title = document.getElementById('account-form-title');
+
+            if (title) title.innerText = 'Editar Conta: ' + accountData.account_name;
             form.querySelector('[name="original_account_name"]').value = accountData.account_name;
             form.querySelector('[name="account_name"]').value = accountData.account_name;
-            exchangeSelect.value = accountData.exchange_name;
+            if (exchangeSelect) exchangeSelect.value = accountData.exchange_name;
             form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
-            toggleCredentialFields(accountData.exchange_name);
+
+            toggleCredentialFields(accountData.exchange_name); // Show/hide correct fields
+
+            // Clear password/secret fields, but fill public ones
             if (accountData.exchange_name === 'pacifica') {
-                form.querySelector('[name="main_public_key"]').value = accountData.main_public_key;
-                form.querySelector('[name="agent_private_key"]').value = '';
+                if(form.querySelector('[name="main_public_key"]')) form.querySelector('[name="main_public_key"]').value = accountData.main_public_key || '';
+                if(form.querySelector('[name="agent_private_key"]')) form.querySelector('[name="agent_private_key"]').value = ''; // Clear secret
             } else if (accountData.exchange_name === 'apex') {
-                form.querySelector('[name="api_key"]').value = accountData.api_key;
-                form.querySelector('[name="api_secret"]').value = '';
-                form.querySelector('[name="passphrase"]').value = '';
-                form.querySelector('[name="zk_seeds"]').value = '';
-                form.querySelector('[name="zk_l2key"]').value = '';
+                if(form.querySelector('[name="api_key"]')) form.querySelector('[name="api_key"]').value = accountData.api_key || '';
+                if(form.querySelector('[name="api_secret"]')) form.querySelector('[name="api_secret"]').value = ''; // Clear secret
+                if(form.querySelector('[name="passphrase"]')) form.querySelector('[name="passphrase"]').value = ''; // Clear secret
+                if(form.querySelector('[name="zk_seeds"]')) form.querySelector('[name="zk_seeds"]').value = ''; // Clear secret
+                if(form.querySelector('[name="zk_l2key"]')) form.querySelector('[name="zk_l2key"]').value = ''; // Clear secret (though this might be public?)
             }
-            toggleAddAccountForm(true);
+            toggleAddAccountForm(true); // Show and scroll to form
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Initial setup for exchange fields visibility
             const exchangeSelect = document.querySelector('select[name="exchange_name"]');
             if (exchangeSelect) {
                 toggleCredentialFields(exchangeSelect.value);
             }
+            // Initial setup for TSL fields visibility
             const exitSelect = document.querySelector('select[name="exit_mode"]');
             if(exitSelect) {
                 toggleTslSection(exitSelect.value);
             }
+
+            // Inicia a tabela de posições colapsada
+            const positionsSection = document.getElementById('positions-section');
+            if (positionsSection) positionsSection.style.display = 'none';
+
+            // Inicia o formulário de setup oculto
+            const setupFormSection = document.getElementById('add-setup-form-section');
+            if (setupFormSection) setupFormSection.style.display = 'none';
+
+            // Inicia os setups de bot colapsados por padrão (CORRIGIDO)
+            document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none'); // Use style.display
+            document.querySelectorAll('[id^^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
+
+            // CORREÇÃO: Mostra o formulário de setup se houver resultado de backtest
+            {% if backtest_result %}
+                const setupForm = document.getElementById('add-setup-form-section');
+                if (setupForm) {
+                    setupForm.style.display = 'block';
+                    setupForm.scrollIntoView({ behavior: 'smooth' });
+                }
+            {% endif %}
         });
     </script>
 </body>

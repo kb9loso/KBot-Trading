@@ -1,4 +1,6 @@
 Flask
+Flask-SocketIO
+simple-websocket
 pandas
 requests
 ccxt

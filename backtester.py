@@ -16,7 +16,7 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 INITIAL_CAPITAL = 100.0
 RISK_PER_TRADE_PCT = 0.01
 STOP_LOSS_LEVELS_PCT = [0.015, 0.02, 0.025, 0.03]
-TAKE_PROFIT_RRRS = [2.0, 2.5, 3.0]
+TAKE_PROFIT_RRRS = [1.0, 1.5, 2.0, 2.5, 3.0]
 # ==============================================================================
 # ======================== FIM DO PAINEL DE CONTROLE ===========================
 # ==============================================================================

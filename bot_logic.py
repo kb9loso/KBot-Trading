@@ -4,6 +4,7 @@ import time
 import json
 from threading import Event
 from decimal import Decimal, ROUND_HALF_UP
+import logging  # <-- INÍCIO DA MODIFICAÇÃO
 
 from exchange_factory import get_client
 from strategies import STRATEGIES, add_all_indicators, get_btc_trend_filter
@@ -27,64 +28,67 @@ def round_to_increment(value: float, increment: float) -> str:
     rounded_value = (value_dec / increment_dec).quantize(Decimal('1'), rounding=ROUND_HALF_UP) * increment_dec
     return "{:f}".format(rounded_value.normalize())
 
+
 class TradingBot:
-    def __init__(self, account_config: dict, global_config: dict, logs_list: list, exchange_name: str):
+    # --- INÍCIO DA MODIFICAÇÃO (__init__) ---
+    def __init__(self, account_config: dict, global_config: dict, exchange_name: str):
         self.account_config = account_config
         self.account_name = account_config.get('account_name', 'Desconhecida')
         self.exchange_name = exchange_name
         self.global_config = global_config
-        self.logs = logs_list
+        # self.logs = logs_list # <-- Removido
 
-        # A inicialização já é genérica, usando a factory
+        # Obtém um logger específico para esta conta
+        self.logger = logging.getLogger(self.account_name)
+
         self.client = get_client(exchange_name, account_config)
+        # --- FIM DA MODIFICAÇÃO ---
 
         self.stop_event = Event()
         self.STRATEGIES = STRATEGIES
         self.market_info_cache = {}
 
+    # --- INÍCIO DA MODIFICAÇÃO (método log) ---
     def log(self, message, level='INFO'):
-        """Adiciona uma mensagem de log estruturada com timestamp, nível e conta."""
-        timestamp = pd.Timestamp.now(tz='America/Sao_Paulo').strftime('%Y-%m-%d %H:%M:%S')
-        log_entry = {
-            "timestamp": timestamp,
-            "account": self.account_name,
-            "level": level,
-            "message": message
-        }
-        self.logs.append(log_entry)
-        print(f"[{timestamp}] [{self.account_name}] [{level}] {message}")
-        while len(self.logs) > 300:
-            self.logs.pop(0)
+        """Envia uma mensagem de log para o sistema de logging central."""
+        level = level.upper()
+
+        if level == 'SUCCESS':
+            self.logger.log(logging.SUCCESS, message)
+        elif level == 'WARNING':
+            self.logger.warning(message)
+        elif level == 'ERROR':
+            self.logger.error(message)
+        elif level == 'DEBUG':
+            self.logger.debug(message)
+        else:  # Trata INFO e EXECUTION como INFO
+            self.logger.info(message)
+
+    # --- FIM DA MODIFICAÇÃO ---
 
     def _apply_initial_settings(self):
         """Sincroniza as configurações de forma inteligente, evitando chamadas desnecessárias."""
         self.log("Iniciando sincronização de configurações (Alavancagem e Margem)...")
-
+        # ... (restante da função sem alterações)
         all_open_positions = self.client.get_open_positions()
         open_position_symbols = {pos['symbol'].upper() for pos in all_open_positions}
-
         try:
             account_settings = self.client.get_account_settings()
             settings_map = {s['symbol'].upper(): s for s in account_settings}
         except (AttributeError, NotImplementedError):
             self.log("A exchange não suporta get_account_settings. Pulando sincronização de margem.", level='WARNING')
             settings_map = {}
-
         if open_position_symbols:
             self.log(
                 f"Posições abertas encontradas: {list(open_position_symbols)}. Configurações não serão alteradas para estes ativos.",
                 level='WARNING')
-
         for setup in self.account_config.get('markets_to_trade', []):
             symbol = setup.get('base_currency').upper()
             if not symbol or symbol in open_position_symbols:
                 continue
-
             desired_leverage = setup.get('leverage')
             desired_isolated = True
-
             current_settings = settings_map.get(symbol)
-
             if not current_settings:
                 self.log(f"{symbol} está com configurações padrão. Atualizando...")
                 if desired_leverage:
@@ -95,11 +99,9 @@ class TradingBot:
                     self.log(
                         f"Alavancagem de {symbol} divergente ({current_settings.get('leverage')}x). Atualizando para {desired_leverage}x...")
                     self.client.update_leverage(symbol, int(desired_leverage))
-
                 if current_settings.get('isolated') != desired_isolated:
                     self.log(f"Modo de margem de {symbol} divergente. Atualizando para ISOLATED...")
                     self.client.update_margin_mode(symbol, is_isolated=desired_isolated)
-
         self.log("Sincronização de configurações concluída.")
 
     def _manage_trailing_stop(self, setup: dict, position: dict, all_open_orders: list, market_data: pd.DataFrame):
@@ -108,19 +110,18 @@ class TradingBot:
         entry_price = float(position.get('entry_price'))
         last_candle = market_data.iloc[-2]
         current_sl_order = next((o for o in all_open_orders if
-                                 o.get('symbol', '').upper() == api_symbol and o.get('order_type', '').startswith('stop')), None)
+                                 o.get('symbol', '').upper() == api_symbol and o.get('order_type', '').startswith(
+                                     'stop')), None)
         if not self.market_info_cache.get(api_symbol):
             self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
         tick_size = float(self.market_info_cache[api_symbol].get('tick_size', 0.01))
 
-        # === Bloco de Garantia de SL (executado para TODOS os modos) ===
         if not current_sl_order:
             self.log(f"Posição em {api_symbol} sem SL. Criando SL inicial com base no setup.", level='WARNING')
             sl_config = setup['stop_loss_config']
             sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else last_candle[
                                                                                                          'ATR'] * sl_config.get(
                 'value', 1.0)
-
             initial_sl_price = entry_price - sl_distance if position_side == 'long' else entry_price + sl_distance
             sl_rounded_str = round_to_increment(initial_sl_price, tick_size)
             result = self.client.set_position_tpsl(
@@ -133,29 +134,24 @@ class TradingBot:
             self.log(f"Resultado da criação do SL inicial: {result}", level='EXECUTION')
             if not (result and result.get('success')):
                 self.log(f"Falha ao criar SL inicial para {api_symbol}.", level='ERROR')
-            return  # Retorna após criar o SL, pois a tarefa deste ciclo está concluída.
+            return
 
-        # === Bloco de Trailing Stop (executado apenas se configurado no setup) ===
         tsl_config = setup.get('trailing_stop_config')
         if not tsl_config or tsl_config.get('type') == 'none':
-            return False  # Se não há TSL, a função termina aqui.
+            return False
 
-        # O restante da função continua com a lógica de breakeven e ATR...
         current_sl_price = float(current_sl_order['stop_price'])
         potential_new_sl = None
 
         if tsl_config['type'] == 'breakeven':
-            # ... (código do breakeven)
             if (position_side == 'long' and current_sl_price >= entry_price) or \
                     (position_side == 'short' and current_sl_price <= entry_price):
                 return
-
             trigger_rrr = tsl_config.get('breakeven_trigger_rrr', 1.0)
             sl_config = setup['stop_loss_config']
             initial_sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
                 last_candle['ATR'] * sl_config['value']
             breakeven_buffer = 0.15 * last_candle['ATR']
-
             if position_side == 'long':
                 breakeven_trigger_price = entry_price + (initial_sl_distance * trigger_rrr)
                 if last_candle['high'] >= breakeven_trigger_price:
@@ -164,12 +160,10 @@ class TradingBot:
                 breakeven_trigger_price = entry_price - (initial_sl_distance * trigger_rrr)
                 if last_candle['low'] <= breakeven_trigger_price:
                     potential_new_sl = entry_price - breakeven_buffer
-
             if potential_new_sl:
                 self.log(f"Breakeven ATINGIDO para {api_symbol}! Potencial novo SL: ${potential_new_sl:.4f}")
 
         elif tsl_config['type'] == 'atr':
-            # ... (código do ATR trailing)
             atr_value = last_candle['ATR']
             current_price = last_candle['close']
             atr_multiple = setup.get('tsl_atr_multiple', 2.0)
@@ -212,6 +206,7 @@ class TradingBot:
             new_sl_rounded_str = round_to_increment(potential_new_sl, tick_size)
             cancel_sl_result = self.client.cancel_stop_order(api_symbol, current_sl_order['order_id'])
             self.log(f"Resultado do cancelamento do SL antigo: {cancel_sl_result}", level='EXECUTION')
+
             if not (cancel_sl_result and cancel_sl_result.get('success')):
                 self.log(f"FALHA ao cancelar SL antigo para {api_symbol}. Abortando TSL.", level='ERROR')
                 return False
@@ -238,20 +233,17 @@ class TradingBot:
         return False
 
     def run(self):
-        self.log(f"Bot para a conta '{self.account_name}' iniciado.")
+        self.log(f"Bot para a conta '{self.account_name}' iniciado.", level='SUCCESS')
         num_setups = len(self.account_config.get('markets_to_trade', []))
         self.log(f"Monitorando {num_setups} setups de trading.")
 
         check_interval = self.account_config.get('check_interval_seconds', 180)
         data_source_exchanges = self.global_config.get('data_source_exchanges', ['binance'])
-
-        # Variável para armazenar a tendência do BTC durante o ciclo
         btc_trend_direction = "long_short"
 
         while not self.stop_event.is_set():
             loop_start_time = time.time()
             try:
-                # Determina a tendência do BTC uma vez por ciclo, se necessário
                 if any(s.get('direction_mode') == 'btc_trend' for s in self.account_config.get('markets_to_trade', [])):
                     btc_trend_direction = get_btc_trend_filter(data_source_exchanges)
                     if btc_trend_direction == "long_only":
@@ -301,7 +293,6 @@ class TradingBot:
                             if data is not None and not data.empty:
                                 market_data = data
                                 break
-
                         if market_data is None or market_data.empty:
                             self.log(f"Nao foi possivel obter dados para monitorar {api_symbol}.", level='ERROR')
                             continue
@@ -348,36 +339,29 @@ class TradingBot:
                         exit_mode = setup.get('exit_mode', 'passivo')
                         if exit_mode == 'ativo' and strategy_logic.get('exit'):
                             position_side = "long" if position.get('side') == 'bid' else "short"
-
-                            if strategy_logic['exit'](df.iloc[-1], df.iloc[-2], position_side):
+                            if strategy_logic['exit'](df.iloc[-2], df.iloc[-3], position_side):
                                 self.log(
                                     f"SINAL DE SAÍDA ESTRATÉGICA DETECTADO para {api_symbol}! Enviando ordem limite de fechamento.",
                                     level='WARNING')
                                 closing_side = "SELL" if position_side == 'long' else "BUY"
-
                                 if not self.market_info_cache.get(api_symbol):
                                     self.market_info_cache[api_symbol] = self.client.get_market_info(api_symbol)
                                 market_info = self.market_info_cache[api_symbol]
                                 tick_size = float(market_info.get('tick_size', 0.01))
-
                                 orderbook = self.client.get_orderbook(api_symbol)
                                 if not orderbook:
                                     self.log(f"Não foi possível obter o order book para fechar {api_symbol}. Pulando.",
                                              level='ERROR')
                                     continue
-
                                 limit_price = 0
                                 price_buffer = 5 * tick_size
-
                                 if closing_side == "SELL":
                                     best_bid_price = float(orderbook['l'][0][0]['p'])
                                     limit_price = best_bid_price + price_buffer
                                 else:
                                     best_ask_price = float(orderbook['l'][1][0]['p'])
                                     limit_price = best_ask_price - price_buffer
-
                                 limit_price_str = round_to_increment(limit_price, tick_size)
-
                                 result = self.client.create_limit_order(
                                     symbol=api_symbol,
                                     side=closing_side,
@@ -388,7 +372,6 @@ class TradingBot:
                                 )
                                 self.log(f"Resultado do envio da ordem de fechamento: {result}", level='EXECUTION')
                                 continue
-
                         continue
 
                     ccxt_symbol = f"{setup['base_currency']}/{setup['quote_currency']}"
@@ -401,15 +384,14 @@ class TradingBot:
                     strategy_logic = self.STRATEGIES[strategy_name]
                     timeframe = strategy_logic.get('timeframe', '15m')
                     min_candles = strategy_logic.get('min_candles', 200)
-
                     market_data = None
+
                     for exchange_name in data_source_exchanges:
                         data = get_historical_klines(ccxt_symbol, timeframe, limit=min_candles,
                                                      exchange_name=exchange_name)
                         if data is not None and not data.empty:
                             market_data = data
                             break
-
                     if market_data is None or market_data.empty:
                         self.log(f"Nao foi possivel obter dados para {ccxt_symbol} em {data_source_exchanges}.",
                                  level='ERROR')
@@ -419,7 +401,6 @@ class TradingBot:
                     last_candle, prev_candle = df.iloc[-2], df.iloc[-3]
                     side = None
                     direction_mode = setup.get('direction_mode', 'long_short')
-
                     can_go_long = True
                     can_go_short = True
 
@@ -436,7 +417,8 @@ class TradingBot:
                         side = "SELL"
 
                     if side:
-                        self.log(f"SINAL {side} DETECTADO para {api_symbol} (Estrategia: {strategy_name})")
+                        self.log(f"SINAL {side} DETECTADO para {api_symbol} (Estrategia: {strategy_name})",
+                                 level='SUCCESS')
                         self.log(
                             f"Configurando alavancagem e modo de margem para {api_symbol} antes de abrir a ordem...")
                         try:
@@ -454,8 +436,8 @@ class TradingBot:
                         market_info = self.market_info_cache[api_symbol]
                         tick_size = float(market_info.get('tick_size', 0.01))
                         lot_size = float(market_info.get('lot_size', 0.01))
-
                         orderbook = self.client.get_orderbook(api_symbol)
+
                         if not orderbook:
                             self.log(f"Não foi possível obter o order book para {api_symbol}. Pulando.", level='ERROR')
                             continue
@@ -467,13 +449,11 @@ class TradingBot:
 
                         limit_price_str = round_to_increment(limit_price, tick_size)
                         entry_price = float(limit_price_str)
-
                         sl_config = setup['stop_loss_config']
                         sl_distance = entry_price * sl_config['value'] if sl_config['type'] == 'percentage' else \
                             last_candle['ATR'] * sl_config['value']
                         rrr = setup['take_profit_rrr']
                         risk_percentage = setup['risk_per_trade']
-
                         stop_loss_price = entry_price - sl_distance if side == "BUY" else entry_price + sl_distance
                         take_profit_price = entry_price + (sl_distance * rrr) if side == "BUY" else entry_price - (
                                 sl_distance * rrr)
@@ -486,40 +466,50 @@ class TradingBot:
                             log_details = (
                                 f"ORDEM LIMITE PREPARADA -> Ativo: {api_symbol}, Lado: {side}, Preço: ${limit_price_str}, Qtd: {amount_rounded_str}, TP: ${take_profit_price_rounded_str}, SL: ${stop_loss_price_rounded_str}")
                             self.log(log_details)
-
                             payload_para_ordem = {
                                 "symbol": api_symbol, "side": side, "amount": amount_rounded_str,
                                 "price": limit_price_str, "take_profit_price": take_profit_price_rounded_str,
                                 "stop_loss_price": stop_loss_price_rounded_str, "tick_size": tick_size
                             }
-
                             result = self.client.create_limit_order(**payload_para_ordem)
-
                             self.log(f"Resultado do envio da ordem: {result}", level='EXECUTION')
 
-                            if result and result.get('data') and result['data'].get('orderId'):
+                            if result and result.get('success') and isinstance(result.get('data'), dict):
                                 order_data_response = result['data']
-                                order_record_to_db = {
-                                    "order_id": order_data_response.get('orderId'),
-                                    "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
-                                    "full_payload": payload_para_ordem, "account_name": self.account_name,
-                                    "exchange": self.exchange_name, "ativo": api_symbol,
-                                    "lado": side, "quantidade": amount_rounded_str,
-                                    "strategy_name": setup.get('strategy_name'),
-                                    "leverage": setup.get('leverage'),
-                                    "risk_per_trade": setup.get('risk_per_trade'),
-                                    "take_profit_rrr": setup.get('take_profit_rrr'),
-                                    "direction_mode": setup.get('direction_mode'),
-                                    "exit_mode": setup.get('exit_mode'),
-                                    "stop_loss_config": setup.get('stop_loss_config'),
-                                    "trailing_stop_config": setup.get('trailing_stop_config'),
-                                    "preco_entrada_aprox": limit_price_str,
-                                    "stop_loss_price": stop_loss_price_rounded_str,
-                                    "take_profit_price": take_profit_price_rounded_str,
-                                }
-                                insert_successful_order(order_record_to_db)
-                                self.log(
-                                    f"Ordem {order_data_response.get('orderId')} salva no banco de dados de historico.")
+                                order_id_value = order_data_response.get('orderId') or order_data_response.get(
+                                    'order_id')
+
+                                if order_id_value:
+                                    order_record_to_db = {
+                                        "order_id": order_id_value,
+                                        "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
+                                        "full_payload": payload_para_ordem,
+                                        "account_name": self.account_name,
+                                        "exchange": self.exchange_name,
+                                        "ativo": api_symbol,
+                                        "lado": side,
+                                        "quantidade": amount_rounded_str,
+                                        "strategy_name": setup.get('strategy_name'),
+                                        "leverage": setup.get('leverage'),
+                                        "risk_per_trade": setup.get('risk_per_trade'),
+                                        "take_profit_rrr": setup.get('take_profit_rrr'),
+                                        "direction_mode": setup.get('direction_mode'),
+                                        "exit_mode": setup.get('exit_mode'),
+                                        "stop_loss_config": setup.get('stop_loss_config'),
+                                        "trailing_stop_config": setup.get('trailing_stop_config'),
+                                        "preco_entrada_aprox": limit_price_str,
+                                        "stop_loss_price": stop_loss_price_rounded_str,
+                                        "take_profit_price": take_profit_price_rounded_str,
+                                    }
+                                    insert_successful_order(order_record_to_db)
+                                    self.log(
+                                        f"Ordem {order_id_value} salva no banco de dados de historico.")
+                                else:
+                                    self.log(f"Falha ao extrair ID da ordem da resposta: {order_data_response}",
+                                             level='WARNING')
+                            elif result and not result.get('success'):
+                                self.log(f"Falha ao criar ordem: {result.get('error', 'Erro desconhecido')}",
+                                         level='ERROR')
                         else:
                             self.log(f"Quantidade da ordem para {api_symbol} é zero.", level='WARNING')
                     else:
@@ -530,6 +520,8 @@ class TradingBot:
 
             except Exception as e:
                 self.log(f"CRITICO no loop: {e}", level='ERROR')
+                # Adiciona o traceback ao log
+                self.logger.error("Traceback do erro:", exc_info=True)
 
             finally:
                 elapsed_time = time.time() - loop_start_time
@@ -537,7 +529,7 @@ class TradingBot:
                 if self.stop_event.wait(timeout=sleep_duration):
                     break
 
-        self.log("Bot foi parado.")
+        self.log("Bot foi parado.", level="WARNING")
 
     def stop(self):
         self.stop_event.set()

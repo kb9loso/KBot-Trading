@@ -187,7 +187,7 @@ def check_and_send_close_alerts_apex():
     # Query na nova tabela para registros onde o alerta ainda não foi enviado
     cursor.execute("""
         SELECT
-            id, account_name, symbol, side, totalPnl, createdAt
+            id, account_name, symbol, side, totalPnl, DATETIME(createdAt, 'localtime')
         FROM
             pnl_history_apex
         WHERE
