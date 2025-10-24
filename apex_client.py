@@ -171,7 +171,6 @@ class ApexClient(BaseExchangeClient):
         current_page = 0
         # A API rejeitou 1000, então usamos um limite menor e seguro por página. 100 é um padrão comum.
         page_limit = 100
-
         try:
             while True:
                 response = self.client.fills_v3(
@@ -180,7 +179,6 @@ class ApexClient(BaseExchangeClient):
                     limit=page_limit,
                     page=current_page
                 )
-
                 if (response and
                         isinstance(response.get('data'), dict) and
                         isinstance(response['data'].get('orders'), list)):

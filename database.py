@@ -89,7 +89,7 @@ def init_db():
         ''')
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS pnl_history_apex (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY,
                 account_name TEXT NOT NULL,
                 symbol TEXT,
                 size REAL,
@@ -240,16 +240,13 @@ def sync_pnl_history(client, account_name: str, start_time_ms: int):
     new_records_count = 0
     for record in pnl_history:
         created_at_str = _ms_to_utc_string(record.get('createdAt'))
-
-        # --- INÍCIO DA CORREÇÃO ---
-        # Adiciona o campo 'alert_sent' na inserção
         cursor.execute('''
             INSERT OR IGNORE INTO pnl_history_apex 
-            (account_name, symbol, size, exitPrice, price, side, totalPnl, createdAt, type, isLiquidate, 
+            (id, account_name, symbol, size, exitPrice, price, side, totalPnl, createdAt, type, isLiquidate, 
             isDeleverage, fee, closeSharedOpenFee, liquidateFee, exitType, closeSharedFundingFee, closeSharedOpenValue, alert_sent) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            account_name, record.get('symbol'), float(record.get('size') or 0.0),
+            record.get('id'), account_name, record.get('symbol'), float(record.get('size') or 0.0),
             float(record.get('exitPrice') or 0.0), float(record.get('price') or 0.0),
             record.get('side'), float(record.get('totalPnl') or 0.0), created_at_str,
             record.get('type'), record.get('isLiquidate'), record.get('isDeleverage'),
@@ -259,7 +256,6 @@ def sync_pnl_history(client, account_name: str, start_time_ms: int):
             float(record.get('closeSharedOpenValue') or 0.0),
             0  # Valor padrão para alert_sent
         ))
-        # --- FIM DA CORREÇÃO ---
         if cursor.rowcount > 0:
             new_records_count += 1
 
