@@ -2,8 +2,10 @@
 import sqlite3
 import json
 from datetime import datetime, timedelta
+import logging
 
 DATABASE_FILE = 'trading_history.db'
+log = logging.getLogger(__name__)
 
 
 def get_db_connection():
@@ -265,3 +267,56 @@ def sync_pnl_history(client, account_name: str, start_time_ms: int):
     conn.close()
     if new_records_count > 0:
         print(f"Sincronização de {new_records_count} novos registros de PNL para a conta {account_name} concluída.")
+
+def query_daily_pnl_all_accounts(start_timestamp_ms: int) -> list:
+    results = []
+    # Converte o timestamp_ms para o formato DATETIME do SQLite 'YYYY-MM-DD HH:MM:SS'
+    start_datetime_str = datetime.fromtimestamp(start_timestamp_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')
+    sql = """
+    SELECT
+        account_name,
+        DATE(created_at) as date, -- Agrupa por dia
+        SUM(pnl) as daily_pnl      -- Soma o PNL do dia
+    FROM trade_history
+    WHERE
+        exchange <> 'apex'
+        AND created_at >= ?    -- Filtra pela data inicial
+    GROUP BY account_name, DATE(created_at) -- Agrupa por conta e dia
+
+    UNION ALL -- Usa UNION ALL pois as fontes são distintas e queremos manter duplicatas se houver (improvável)
+
+    SELECT
+        account_name,
+        DATE(createdAt) as date,    -- Agrupa por dia (nome da coluna diferente na Apex)
+        SUM(totalPnl) as daily_pnl -- Soma o PNL do dia (nome da coluna diferente na Apex)
+    FROM pnl_history_apex
+    WHERE
+        createdAt >= ?           -- Filtra pela data inicial
+    GROUP BY account_name, date -- Agrupa por conta e dia
+    ORDER BY DATE(createdAt), account_name; -- Opcional: ordena o resultado final
+    """
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            conn.row_factory = sqlite3.Row  # Try setting it again here just in case
+
+            cursor = conn.cursor()
+            cursor.execute(sql, (start_datetime_str, start_datetime_str))
+            rows = cursor.fetchall()  # Fetch all rows (will be tuples if row_factory failed)
+            column_names = [description[0] for description in cursor.description]
+
+            # Manually build list of dictionaries using column names and row tuples
+            results = [dict(zip(column_names, row)) for row in rows]
+
+            log.info(f"Consulta de PNL diário unificada retornou {len(results)} registros.")
+        except sqlite3.Error as e:
+            log.error(f"Erro ao executar a query de PNL diário unificada: {e}", exc_info=True)
+            results = []
+        finally:
+            conn.close()
+            log.debug("Conexão com o banco de dados fechada.")
+    else:
+        log.error("Não foi possível conectar ao banco de dados para buscar PNL diário.")
+
+    return results

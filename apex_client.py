@@ -532,7 +532,6 @@ class ApexClient(BaseExchangeClient):
 
                     pnl_page_data = response['data']['historicalPnl']
                     all_pnl_entries.extend(pnl_page_data)
-
                     # Verifica se a página atual está vazia ou se já buscamos todos os registros
                     total_size = response['data'].get('totalSize', 0)
                     if not pnl_page_data or len(all_pnl_entries) >= total_size:

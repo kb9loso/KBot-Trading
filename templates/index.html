@@ -7,6 +7,8 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,6 +106,7 @@
             text-transform: uppercase;
             border-width: 1px;
             border-style: solid;
+            white-space: nowrap;
 
             /* Cores serão definidas via JS (inline style) */
             background-color: transparent; /* Começa transparente */
@@ -482,8 +485,14 @@
                 </h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     {% if dashboard and dashboard.total_trades > 0 %}
-                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
-                            <div class="flex items-center gap-3 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-dollar-sign w-6 h-6 {{ 'text-green-400' if dashboard.total_pnl >= 0 else 'text-red-400' }}"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span class="text-sm text-gray-400">PNL TOTAL</span></div>
+                        <div id="pnl-card" class="bg-slate-800 border border-slate-700 rounded-xl p-5 cursor-pointer hover:bg-slate-700/60 transition-colors">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-dollar-sign w-6 h-6 {{ 'text-green-400' if dashboard.total_pnl >= 0 else 'text-red-400' }}"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                    <span class="text-sm text-gray-400">PNL TOTAL</span>
+                                </div>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart text-slate-500"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                            </div>
                             <div class="text-2xl font-bold {{ 'text-green-400' if dashboard.total_pnl >= 0 else 'text-red-400' }}">${{ "%.2f"|format(dashboard.total_pnl) }}</div>
                         </div>
                         <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
@@ -798,9 +807,6 @@
                     <button id="log-download-btn" class="log-control-btn" title="Baixar logs filtrados (.txt)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
-                    <button id="log-clear-btn" class="log-control-btn" title="Limpar logs da tela">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                    </button>
                 </div>
             </div>
 
@@ -842,534 +848,90 @@
             </div>
         </div>
         </div>
+    <div id="pnlChartModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50" style="display: none;">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-3xl relative">
+        <button onclick="closePnlChartModal()" class="absolute top-3 right-4 text-slate-400 hover:text-white text-2xl font-bold">&times;</button>
+        <h3 class="text-lg font-semibold mb-4 text-center">PNL Acumulado Relativo - Últimos 30 Dias</h3>
+        <div class="chart-container relative h-64 md:h-96">
+            <canvas id="pnlChartCanvas"></canvas>
+        </div>
+        <p id="pnlChartError" class="text-red-400 text-center mt-4" style="display: none;"></p>
+    </div>
+</div>
 
     <script>
-        // --- LOG PANEL LOGIC ---
-        document.addEventListener('DOMContentLoaded', () => {
+        // --- Definições de Funções Globais (Acessíveis via onclick e no DOMContentLoaded) ---
 
-            // --- Estado Global dos Logs ---
-            let allLogs = []; // Histórico completo recebido + novos logs
-            let filteredLogs = []; // Logs atualmente visíveis após filtros
-            let isPaused = false;
-            let isAutoScroll = true;
-            const accountColors = {}; // Armazena cores por nome de conta/logger
-            const colorPalette = [ // Cores para os badges de conta
-                '#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#64748b'
-            ];
-            let colorIndex = 0;
-            const MAX_LOGS_DISPLAY = 500; // Limite de linhas no DOM para performance
-
-            // --- Referências de DOM ---
-            const logWindow = document.getElementById('log-window');
-            const noResultsMsg = document.getElementById('log-no-results');
-            // Contadores
-            const countAll = document.getElementById('log-count-all');
-            const countInfo = document.getElementById('log-count-info');
-            const countSuccess = document.getElementById('log-count-success');
-            const countWarning = document.getElementById('log-count-warning');
-            const countError = document.getElementById('log-count-error');
-            // Filtros
-            const searchInput = document.getElementById('log-search-input');
-            const levelFilter = document.getElementById('log-level-filter');
-            const accountFilter = document.getElementById('log-account-filter');
-            // Controles
-            const autoScrollBtn = document.getElementById('log-autoscroll-btn');
-            const pauseBtn = document.getElementById('log-pause-btn');
-            const pauseIcon = document.getElementById('log-pause-icon');
-            const playIcon = document.getElementById('log-play-icon');
-            const pauseText = document.getElementById('log-pause-text');
-            const copyBtn = document.getElementById('log-copy-btn');
-            const downloadBtn = document.getElementById('log-download-btn');
-            const clearBtn = document.getElementById('log-clear-btn');
-            // Status Footer
-            const statusIndicator = document.getElementById('log-status-indicator');
-            const statusText = document.getElementById('log-status-text');
-            const countShowing = document.getElementById('log-count-showing');
-            const countTotal = document.getElementById('log-count-total');
-
-            // --- INÍCIO DA MODIFICAÇÃO (Popular Filtro Estático e Definir Cores) ---
-            // Pega a variável 'accounts' passada pelo Flask/Jinja2
-            const registeredAccountsData = {{ accounts | tojson | safe }};
-            const accountNames = registeredAccountsData.map(acc => acc.account_name).sort(); // Extrai e ordena os nomes
-
-            // Limpa o filtro (exceto a opção "TODAS") e popula com contas cadastradas
-            accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>'; // Garante que começa limpo
-            const accountFragment = document.createDocumentFragment();
-            accountNames.forEach(accName => {
-                 const option = document.createElement('option');
-                 option.value = accName;
-                 option.textContent = accName;
-                 accountFragment.appendChild(option);
-
-                 // Define a cor para o badge desta conta
-                 if (!accountColors[accName]) {
-                      accountColors[accName] = colorPalette[colorIndex % colorPalette.length];
-                      colorIndex++;
-                 }
-            });
-            accountFilter.appendChild(accountFragment); // Adiciona todas as opções de uma vez
-
-            // Define cores para loggers internos (para que os badges funcionem)
-             ['Sistema', 'Backtester', 'werkzeug', 'socketio', 'engineio'].forEach(internalName => {
-                 if (!accountColors[internalName]) {
-                      accountColors[internalName] = colorPalette[colorIndex % colorPalette.length];
-                      colorIndex++;
-                 }
-             });
-            // --- FIM DA MODIFICAÇÃO ---
-
-
-            // --- Conexão SocketIO ---
-            const socket = io();
-
-            socket.on('connect', () => {
-                console.log('Socket.IO Conectado!');
-                statusIndicator.classList.add('active');
-                statusIndicator.classList.remove('paused');
-            });
-
-            socket.on('disconnect', () => {
-                console.warn('Socket.IO Desconectado!');
-                statusText.textContent = 'Desconectado. Tentando reconectar...';
-                statusIndicator.classList.remove('active');
-                statusIndicator.classList.add('paused');
-            });
-
-            socket.on('initial_logs', (initialLogs) => {
-                console.log(`Recebido histórico de ${initialLogs.length} logs.`);
-                allLogs = initialLogs;
-
-                // Apenas garante que os filtros estejam resetados ao carregar
-                // O filtro de conta já foi populado estaticamente
-                accountFilter.value = 'ALL';
-                levelFilter.value = 'ALL';
-                searchInput.value = '';
-
-                renderLogs(); // Renderiza o histórico com os filtros resetados
-                statusText.textContent = 'Conectado. Logs ativos.';
-            });
-
-            socket.on('new_log', (log) => {
-                allLogs.push(log);
-                 // Garante que a cor seja definida se for uma conta/logger novo (embora não adicione ao filtro)
-                 if (log.account && !accountColors[log.account]) {
-                     accountColors[log.account] = colorPalette[colorIndex % colorPalette.length];
-                     colorIndex++;
-                 }
-
-                if (!isPaused) {
-                    const isVisible = isLogVisible(log, searchInput.value, levelFilter.value, accountFilter.value);
-                    if (isVisible) {
-                        appendLogLine(log);
-                        limitDOMLogs();
-                    }
-                    updateCounters();
-                    updateFooterStats();
-                } else {
-                    updateCounters();
-                    updateFooterStats();
-                }
-            });
-
-            // --- Funções Principais ---
-
-            function renderLogs() {
-                const searchTerm = searchInput.value.toLowerCase();
-                const selectedLevel = levelFilter.value;
-                const selectedAccount = accountFilter.value; // Lê o valor SELECIONADO ATUALMENTE
-
-                filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
-                const logsToDisplay = filteredLogs.slice(-MAX_LOGS_DISPLAY);
-
-                logWindow.innerHTML = '';
-
-                if (logsToDisplay.length > 0) {
-                    const fragment = document.createDocumentFragment();
-                    logsToDisplay.forEach(log => {
-                        fragment.appendChild(createLogLineElement(log));
-                    });
-                    logWindow.appendChild(fragment);
-                    logWindow.style.display = 'block';
-                    noResultsMsg.style.display = 'none';
-                } else if (allLogs.length > 0) {
-                    logWindow.style.display = 'none';
-                    noResultsMsg.style.display = 'block';
-                } else {
-                    logWindow.style.display = 'block';
-                    noResultsMsg.style.display = 'none';
-                }
-
-                updateCounters();
-                updateFooterStats(logsToDisplay.length);
-                // Não chama scrollToBottom aqui diretamente, deixa limitDOMLogs cuidar disso
+        // Funções de Utilidade Geral (usadas por Logs e Gráfico)
+        function hexToRgba(hex, alpha = 1) {
+            if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
+                 return `rgba(51, 65, 85, ${alpha})`; // slate-700 fallback
             }
+            const fullHex = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
+            const bigint = parseInt(fullHex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            const validAlpha = Math.max(0, Math.min(1, alpha));
+            return `rgba(${r}, ${g}, ${b}, ${validAlpha})`;
+        }
 
-            function appendLogLine(log) {
-                if (searchInput.value) { // Se busca ativa, renderLogs já trata
-                     renderLogs(); // Re-renderiza para aplicar highlight e limite
-                     return;
-                }
-
-                logWindow.style.display = 'block';
-                noResultsMsg.style.display = 'none';
-
-                const logElement = createLogLineElement(log);
-                logWindow.appendChild(logElement);
+        function lightenHexColor(hex, percent) {
+            if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
+                return '#CBD5E1'; // slate-300 fallback
             }
+             const fullHex = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
+            let f = parseInt(fullHex.slice(1), 16), t = percent < 0 ? 0 : 255, p = (typeof percent === 'number' ? percent : 50), R = f >> 16, G = (f >> 8) & 0x00ff, B = f & 0x0000ff;
+             p = Math.max(0, Math.min(100, p < 0 ? p * -1 : p));
+            return "#" + (0x1000000 + (Math.round(((t - R) * p) / 100) + R) * 0x10000 + (Math.round(((t - G) * p) / 100) + G) * 0x100 + (Math.round(((t - B) * p) / 100) + B)).toString(16).slice(1).toUpperCase();
+        }
 
-            function limitDOMLogs() {
-                let logsRemoved = 0;
-                // Só remove se não estiver buscando
-                // E só remove se o número de filhos EXCEDER o limite
-                while (logWindow.childElementCount > MAX_LOGS_DISPLAY && !searchInput.value) {
-                     if(logWindow.firstChild) { // Checa se existe antes de remover
-                         logWindow.removeChild(logWindow.firstChild);
-                         logsRemoved++;
-                     } else {
-                         break; // Sai do loop se não houver mais filhos
-                     }
-                }
+        function escapeHTML(str) { // Usada pelos Logs
+            if (typeof str !== 'string') return '';
+            return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
 
-                updateFooterStats(); // Atualiza contagem exibida
+        function escapeRegExp(string) { // Usada pelos Logs
+             if (typeof string !== 'string') return '';
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
 
-                // Scroll só se autoscroll estiver ativo
-                if (isAutoScroll) {
-                    scrollToBottom();
-                }
-            }
+        function copyToClipboard(text) { // Usada no Header (Donate)
+             navigator.clipboard.writeText(text).then(() => { alert("Endereço copiado!"); }, (err) => { alert("Falha ao copiar: ", err); });
+        }
 
+        // Variável Global para Chart Instance (para poder destruir)
+        let pnlChartInstance = null;
+        // Função Global para fechar o Modal (chamada pelo botão e pelo clique fora)
+        function closePnlChartModal() {
+            const modal = document.getElementById('pnlChartModal');
+            if (modal) modal.style.display = 'none';
+            const errorMsg = document.getElementById('pnlChartError');
+            if (errorMsg) errorMsg.style.display = 'none';
+            if (pnlChartInstance) { pnlChartInstance.destroy(); pnlChartInstance = null; }
+        }
 
-            function createLogLineElement(log) {
-                const line = document.createElement('div');
-                line.className = 'log-line';
-                line.dataset.level = log.level;
-
-                const icon = getLevelIcon(log.level);
-                const timestamp = `<span class="log-timestamp">${log.timestamp}</span>`;
-                const badge = getAccountBadge(log.account);
-
-                const searchTerm = searchInput.value;
-                let message = log.is_html ? log.message : escapeHTML(log.message || '');
-
-                if (searchTerm && !log.is_html && message) {
-                    try {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = message;
-                        const textNodes = getTextNodes(tempDiv);
-                        const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
-
-                        textNodes.forEach(node => {
-                            const parent = node.parentNode;
-                            if (!parent) return; // Adiciona checagem de segurança
-                            const text = node.nodeValue;
-                            let lastIndex = 0;
-                            let match;
-                            const fragment = document.createDocumentFragment();
-
-                            while ((match = regex.exec(text)) !== null) {
-                                fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
-                                const mark = document.createElement('mark');
-                                mark.textContent = match[0];
-                                fragment.appendChild(mark);
-                                lastIndex = regex.lastIndex;
-                            }
-                            fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
-                             // Verifica se o nó ainda pertence ao pai antes de substituir
-                            if (node.parentNode === parent) {
-                                parent.replaceChild(fragment, node);
-                            }
-                        });
-                        message = tempDiv.innerHTML;
-                    } catch (e) {
-                         console.error("Erro no regex de highlight:", e);
-                    }
-                }
-
-                line.innerHTML = `${icon}${timestamp}${badge}<span class="log-message">${message}</span>`;
-                return line;
-            }
-
-            function getTextNodes(node) {
-                const textNodes = [];
-                const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
-                let currentNode;
-                while(currentNode = walk.nextNode()) {
-                     if (currentNode.parentNode && currentNode.parentNode.nodeName !== 'SCRIPT' && currentNode.parentNode.nodeName !== 'STYLE') { // Checa parentNode
-                          textNodes.push(currentNode);
-                     }
-                }
-                return textNodes;
-            }
-
-
-            // --- Funções Auxiliares de UI ---
-
-            function updateCounters() {
-                let info = 0, success = 0, warning = 0, error = 0;
-                allLogs.forEach(log => {
-                    switch (log.level) {
-                        case 'INFO': info++; break;
-                        case 'SUCCESS': success++; break;
-                        case 'WARNING': warning++; break;
-                        case 'ERROR': error++; break;
-                    }
-                });
-                countAll.textContent = allLogs.length;
-                countInfo.textContent = info;
-                countSuccess.textContent = success;
-                countWarning.textContent = warning;
-                countError.textContent = error;
-            }
-
-            function updateFooterStats(showingCount = null) {
-                countShowing.textContent = showingCount !== null ? showingCount : logWindow.childElementCount;
-                countTotal.textContent = allLogs.length;
-            }
-
-
-            function scrollToBottom() {
-                 // Verifica se o usuário não rolou para cima manualmente
-                 // Margem de erro de ~10 pixels
-                const isScrolledToBottom = logWindow.scrollHeight - logWindow.clientHeight <= logWindow.scrollTop + 10;
-
-                if (isAutoScroll || isScrolledToBottom) {
-                    const lastLog = logWindow.lastElementChild;
-                    if(lastLog) {
-                         // Usar 'instant' pode ser melhor para logs rápidos
-                         lastLog.scrollIntoView({ behavior: 'auto', block: 'end' });
-                    }
-                }
-            }
-
-            function getLevelIcon(level) {
-                let svgClass = "log-icon";
-                let svgContent = '';
-                 switch (level) {
-                    case 'INFO': svgContent = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'; break;
-                    case 'SUCCESS': svgContent = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'; break;
-                    case 'WARNING': svgContent = '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'; break;
-                    case 'ERROR': svgContent = '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'; break;
-                    default: svgClass += " text-purple-400"; svgContent = '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>';
-                 }
-                 return `<svg class="${svgClass}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgContent}</svg>`;
-            }
-
-            function getAccountBadge(account) {
-                 if (!account) return '';
-                 let baseColor = accountColors[account];
-                 if (!baseColor) {
-                      baseColor = colorPalette[colorIndex % colorPalette.length];
-                      accountColors[account] = baseColor;
-                      colorIndex++;
-                 }
-
-                 // --- INÍCIO DA MODIFICAÇÃO (Estilo v4) ---
-                 // Define as cores
-                 const backgroundColorRgba = hexToRgba(baseColor, 0.15); // Fundo 15% transparente
-                 const lightColorHex = lightenHexColor(baseColor, 65); // Texto/Borda ~65% mais claro que baseColor
-
-                 // Aplica os estilos inline
-                 return `<span class="log-account-badge" style="background-color: ${backgroundColorRgba}; color: ${lightColorHex}; border-color: ${lightColorHex};">${escapeHTML(account)}</span>`;
-                 // --- FIM DA MODIFICAÇÃO ---
-            }
-
-            function lightenHexColor(hex, percent) {
-                if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
-                    return '#CBD5E1'; // Cor slate-300 como fallback
-                }
-                 const fullHex = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
-
-                let f = parseInt(fullHex.slice(1), 16),
-                    t = percent < 0 ? 0 : 255,
-                    // Garante que percent seja um número
-                    p = (typeof percent === 'number' ? percent : 50),
-                    R = f >> 16,
-                    G = (f >> 8) & 0x00ff,
-                    B = f & 0x0000ff;
-
-                 // Ajusta p para clarear (0 a 100)
-                 p = Math.max(0, Math.min(100, p < 0 ? p * -1 : p));
-
-                return "#" + (
-                    0x1000000 +
-                    (Math.round(((t - R) * p) / 100) + R) * 0x10000 +
-                    (Math.round(((t - G) * p) / 100) + G) * 0x100 +
-                    (Math.round(((t - B) * p) / 100) + B)
-                ).toString(16).slice(1).toUpperCase(); // Garante uppercase
-            }
-
-            function hexToRgba(hex, alpha = 1) {
-                if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) {
-                     // Cor cinza fallback mais escura
-                     return `rgba(51, 65, 85, ${alpha})`; // Cor slate-700
-                }
-                const fullHex = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
-                const bigint = parseInt(fullHex.slice(1), 16);
-                const r = (bigint >> 16) & 255;
-                const g = (bigint >> 8) & 255;
-                const b = bigint & 255;
-                // Garante que alpha esteja entre 0 e 1
-                const validAlpha = Math.max(0, Math.min(1, alpha));
-                return `rgba(${r}, ${g}, ${b}, ${validAlpha})`;
-            }
-
-            // --- Funções de Filtro ---
-            function isLogVisible(log, searchTerm, selectedLevel, selectedAccount) {
-                 if (!log) return false;
-                const levelMatch = selectedLevel === 'ALL' || log.level === selectedLevel;
-                const accountMatch = selectedAccount === 'ALL' || log.account === selectedAccount;
-                const safeSearchTerm = searchTerm || '';
-                const searchMatch = !safeSearchTerm ||
-                                    (log.timestamp && log.timestamp.includes(safeSearchTerm)) ||
-                                    (log.account && log.account.toLowerCase().includes(safeSearchTerm)) ||
-                                    (log.message && log.message.toLowerCase().includes(safeSearchTerm));
-                return levelMatch && accountMatch && searchMatch;
-            }
-
-
-            // --- Funções de Controle ---
-            function toggleAutoScroll() {
-                isAutoScroll = !isAutoScroll;
-                autoScrollBtn.classList.toggle('active', isAutoScroll);
-                if (isAutoScroll) {
-                    scrollToBottom();
-                }
-            }
-
-            function togglePause() {
-                isPaused = !isPaused;
-                pauseBtn.classList.toggle('active', isPaused);
-                if (isPaused) {
-                    pauseText.textContent = 'Retomar';
-                    pauseIcon.style.display = 'none';
-                    playIcon.style.display = 'inline-block';
-                    statusText.textContent = 'Logs pausados.';
-                    statusIndicator.classList.remove('active');
-                    statusIndicator.classList.add('paused');
-                } else {
-                    pauseText.textContent = 'Pausar';
-                    pauseIcon.style.display = 'inline-block';
-                    playIcon.style.display = 'none';
-                    statusText.textContent = 'Conectado. Logs ativos.';
-                    statusIndicator.classList.add('active');
-                    statusIndicator.classList.remove('paused');
-                    renderLogs(); // Re-renderiza para aplicar logs que chegaram
-                }
-            }
-
-            function clearLogs() {
-                 // Limpa apenas o DOM
-                if (confirm('Deseja limpar os logs visíveis na tela? (O histórico completo será mantido)')) {
-                    logWindow.innerHTML = '';
-                    updateFooterStats(0);
-                    noResultsMsg.style.display = 'none';
-                    // Re-renderiza com os filtros atuais (mostrará vazio ou "nenhum resultado")
-                    renderLogs();
-                }
-            }
-
-            function logToText(log) {
-                 if (!log) return "";
-                let message = log.message || "";
-                if (log.is_html) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = message;
-                    const preElement = tempDiv.querySelector('pre');
-                    message = preElement ? (preElement.textContent || preElement.innerText || '') : (tempDiv.textContent || tempDiv.innerText || '');
-                }
-                 message = message.replace(/\s+/g, ' ').trim();
-                return `[${log.timestamp || 'N/A'}] [${log.account || 'N/A'}] [${log.level || 'N/A'}] ${message}`;
-            }
-
-            function copyLogs() {
-                const logsToCopyText = filteredLogs.map(logToText).join('\n'); // Usa filteredLogs (completo na memória)
-                navigator.clipboard.writeText(logsToCopyText).then(() => {
-                    alert(`${filteredLogs.length} logs filtrados copiados!`);
-                }).catch(err => {
-                    console.error('Falha ao copiar logs: ', err);
-                    alert('Falha ao copiar logs. Verifique o console.');
-                });
-            }
-
-            function downloadLogs() {
-                const logsToDownloadText = filteredLogs.map(logToText).join('\n'); // Usa filteredLogs (completo na memória)
-                const blob = new Blob([logsToDownloadText], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                a.href = url;
-                a.download = `kbot-logs-${timestamp}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-
-            // --- Funções de Utilidade ---
-            function escapeHTML(str) {
-                if (typeof str !== 'string') return '';
-                return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            }
-
-            function escapeRegExp(string) {
-                 if (typeof string !== 'string') return '';
-                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            }
-
-            // --- Bind de Eventos ---
-            // Adiciona debounce ao input de busca para performance
-            let searchTimeout;
-            searchInput.addEventListener('input', () => {
-                 clearTimeout(searchTimeout);
-                 searchTimeout = setTimeout(() => {
-                      renderLogs();
-                 }, 250); // Atraso de 250ms
-            });
-            //searchInput.addEventListener('input', renderLogs); // <-- Remove chamada direta
-            levelFilter.addEventListener('change', renderLogs);
-            accountFilter.addEventListener('change', renderLogs);
-
-            autoScrollBtn.addEventListener('click', toggleAutoScroll);
-            pauseBtn.addEventListener('click', togglePause);
-            clearBtn.addEventListener('click', clearLogs);
-            copyBtn.addEventListener('click', copyLogs);
-            downloadBtn.addEventListener('click', downloadLogs);
-
-             // Adiciona listener para desativar autoscroll se usuário rolar para cima
-             logWindow.addEventListener('scroll', () => {
-                 // Se o usuário rolou para cima e o autoscroll está ativo
-                 if (logWindow.scrollTop < logWindow.scrollHeight - logWindow.clientHeight - 50 && isAutoScroll) {
-                      isAutoScroll = false;
-                      autoScrollBtn.classList.remove('active');
-                 }
-             });
-
-            // Inicializa a UI (mostra vazio inicialmente, espera 'initial_logs')
-            renderLogs();
-        });
-
-
-        // --- SCRIPT ORIGINAL DA PÁGINA ---
+        // --- Funções da Lógica Original da Página (Restauradas e Globais) ---
         const exchangesData = {{ exchanges_data | tojson | safe }};
 
         function toggleSetups(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
-            if (content) {
-                if (content.style.display === 'none') {
+            if (content && icon) { // Adiciona checagem se icon existe
+                if (content.style.display === 'none' || content.style.display === '') { // Checa '' também
                     content.style.display = 'block';
-                    if (icon) icon.style.transform = 'rotate(0deg)';
+                    icon.style.transform = 'rotate(0deg)';
                 } else {
                     content.style.display = 'none';
-                    if (icon) icon.style.transform = 'rotate(180deg)';
+                    icon.style.transform = 'rotate(180deg)';
                 }
+            } else if (content) { // Se só o content existe
+                 content.style.display = (content.style.display === 'none' || content.style.display === '') ? 'block' : 'none';
             }
         }
 
         function resetSetupForm() {
-            const form = document.getElementById('setup-form');
-            if (!form) return;
-            form.reset();
+            const form = document.getElementById('setup-form'); if (!form) return; form.reset();
             if(form.querySelector('[name="risk"]')) form.querySelector('[name="risk"]').value = "1.0";
             if(form.querySelector('[name="leverage"]')) form.querySelector('[name="leverage"]').value = "10";
             if(form.querySelector('[name="sl_value"]')) form.querySelector('[name="sl_value"]').value = "2.0";
@@ -1381,227 +943,286 @@
         }
 
         function hideSetupForm() {
-            const section = document.getElementById('add-setup-form-section');
-            if (section) section.style.display = 'none';
-            resetSetupForm();
+             const section = document.getElementById('add-setup-form-section'); if (section) section.style.display = 'none'; resetSetupForm();
         }
 
         function showSetupForm(setupData) {
-            const section = document.getElementById('add-setup-form-section');
-            const form = document.getElementById('setup-form');
-            if (!section || !form) return;
-            resetSetupForm();
-            if (setupData) { // Modo Editar
-                form.querySelector('[name="account_name"]').value = setupData.account_name;
-                form.querySelector('[name="base_currency"]').value = setupData.base_currency;
-                form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
-                form.querySelector('[name="leverage"]').value = setupData.leverage;
-                form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
-                form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
-                form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
-                const slValueInput = form.querySelector('[name="sl_value"]');
-                slValueInput.value = (setupData.stop_loss_config.type === 'percentage') ? setupData.stop_loss_config.value * 100 : setupData.stop_loss_config.value;
-                const exitModeSelect = form.querySelector('[name="exit_mode"]');
-                exitModeSelect.value = setupData.exit_mode;
-                toggleTslSection(setupData.exit_mode);
-                const tslConfig = setupData.trailing_stop_config;
-                const tslTypeSelect = form.querySelector('[name="tsl_type"]');
-                if (tslConfig && tslConfig.type !== 'none') {
-                    tslTypeSelect.value = tslConfig.type;
-                    if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) {
-                        form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
-                    }
-                    if (form.querySelector('[name="remove_tp_on_trail"]')) {
-                        form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
-                    }
-                } else if (tslTypeSelect) {
-                    tslTypeSelect.value = 'none';
-                }
-                toggleTslOptions(tslTypeSelect ? tslTypeSelect.value : 'none');
-            } else { // Modo Adicionar
-                {% if accounts %}
-                if (form.querySelector('[name="account_name"]')) {
-                    form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}";
-                }
-                {% endif %}
-            }
-            section.style.display = 'block';
-            section.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => { alert("Endereço copiado!"); }, (err) => { alert("Falha ao copiar: ", err); });
-        }
+             const section = document.getElementById('add-setup-form-section'); const form = document.getElementById('setup-form'); if (!section || !form) return; resetSetupForm();
+             if (setupData) { // Edit Mode
+                 form.querySelector('[name="account_name"]').value = setupData.account_name; form.querySelector('[name="base_currency"]').value = setupData.base_currency;
+                 form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100; form.querySelector('[name="leverage"]').value = setupData.leverage;
+                 form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short'; form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
+                 form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
+                 const slValueInput = form.querySelector('[name="sl_value"]'); slValueInput.value = (setupData.stop_loss_config?.type === 'percentage') ? (setupData.stop_loss_config.value * 100) : setupData.stop_loss_config?.value; // Added safe navigation
+                 const exitModeSelect = form.querySelector('[name="exit_mode"]'); exitModeSelect.value = setupData.exit_mode; toggleTslSection(setupData.exit_mode);
+                 const tslConfig = setupData.trailing_stop_config; const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+                 if (tslConfig && tslConfig.type !== 'none') {
+                     if(tslTypeSelect) tslTypeSelect.value = tslConfig.type; // Check if select exists
+                     if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) { form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr; }
+                     if (form.querySelector('[name="remove_tp_on_trail"]')) { form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false; }
+                 } else if (tslTypeSelect) { tslTypeSelect.value = 'none'; }
+                 if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value); // Check if select exists
+             } else { // Add Mode
+                  {% if accounts %} if (form.querySelector('[name="account_name"]')) { form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}"; } {% endif %}
+             }
+             section.style.display = 'block'; section.scrollIntoView({ behavior: 'smooth' });
+         }
 
         function validateAccountForm() {
-            const form = document.getElementById('account-form');
-            if (!form) return false;
-            const exchangeName = form.querySelector('[name="exchange_name"]').value;
-            const originalAccountName = form.querySelector('[name="original_account_name"]').value;
-            const exchange = exchangesData[exchangeName];
-            if (exchange && !exchange.multi_account_allowed && exchange.accounts && exchange.accounts.length > 0) {
-                if (!originalAccountName || (exchange.accounts[0] && exchange.accounts[0].account_name !== originalAccountName)) {
-                    alert(`A exchange '${exchangeName}' não permite múltiplas contas. Você só pode editar a conta existente.`); return false;
-                }
-            }
-            const requiredFields = form.querySelectorAll('[required]');
-            for (let field of requiredFields) {
-                if (field.offsetParent !== null && !field.value.trim()) {
-                    alert(`O campo '${field.previousElementSibling?.textContent || field.name}' é obrigatório.`); field.focus(); return false;
-                }
-            }
-            return true;
+             const form = document.getElementById('account-form'); if (!form) return false; const exchangeName = form.querySelector('[name="exchange_name"]').value; const originalAccountName = form.querySelector('[name="original_account_name"]').value;
+             const exchange = exchangesData[exchangeName]; if (exchange && !exchange.multi_account_allowed && exchange.accounts && exchange.accounts.length > 0) { if (!originalAccountName || (exchange.accounts[0] && exchange.accounts[0].account_name !== originalAccountName)) { alert(`A exchange '${exchangeName}' não permite múltiplas contas.`); return false; } }
+             const requiredFields = form.querySelectorAll('[required]'); for (let field of requiredFields) { if (field.offsetParent !== null && !field.value.trim()) { alert(`O campo '${field.previousElementSibling?.textContent || field.name}' é obrigatório.`); field.focus(); return false; } } return true;
         }
 
         function toggleTslSection(exitMode) {
-            const tslSection = document.getElementById('tsl-section');
-            if (!tslSection) return;
-            if (exitMode === 'ativo') {
-                tslSection.style.display = 'flex';
-            } else {
-                tslSection.style.display = 'none';
-                const tslTypeSelect = document.querySelector('select[name="tsl_type"]');
-                if (tslTypeSelect) tslTypeSelect.value = 'none';
-                toggleTslOptions('none');
-            }
+             const tslSection = document.getElementById('tsl-section'); if (!tslSection) return;
+             if (exitMode === 'ativo') { tslSection.style.display = 'flex'; }
+             else { tslSection.style.display = 'none'; const tslTypeSelect = document.querySelector('select[name="tsl_type"]'); if (tslTypeSelect) { tslTypeSelect.value = 'none'; toggleTslOptions('none'); } }
         }
 
         function toggleTslOptions(tslType) {
-            const breakevenOptions = document.getElementById('tsl-breakeven-options');
-            const atrOptions = document.getElementById('tsl-atr-options');
-            const removeTpCheckboxLabel = document.querySelector('label[title*="Take Profit original"]');
-            if (breakevenOptions) breakevenOptions.style.display = tslType === 'breakeven' ? 'flex' : 'none';
-            if (atrOptions) atrOptions.style.display = tslType === 'atr' ? 'flex' : 'none';
-            if (removeTpCheckboxLabel) { removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none'; }
+             const breakevenOptions = document.getElementById('tsl-breakeven-options'); const atrOptions = document.getElementById('tsl-atr-options'); const removeTpCheckboxLabel = document.querySelector('label[title*="Take Profit original"]');
+             if (breakevenOptions) breakevenOptions.style.display = tslType === 'breakeven' ? 'flex' : 'none'; if (atrOptions) atrOptions.style.display = tslType === 'atr' ? 'flex' : 'none'; if (removeTpCheckboxLabel) { removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none'; }
         }
 
         function togglePositionsTable() {
-            const section = document.getElementById('positions-section');
-            const icon = document.getElementById('positions-toggle-icon');
-            if (!section || !icon) return;
-            const isOpen = section.style.display === 'block';
-            if (isOpen) {
-                section.style.display = 'none';
-                icon.classList.remove('open');
-                icon.innerHTML = '<path d="m6 9 6 6 6-6"/>';
-            } else {
-                section.style.display = 'block';
-                icon.classList.add('open');
-                icon.innerHTML = '<path d="m18 15-6-6-6 6"/>';
-                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+             const section = document.getElementById('positions-section'); const icon = document.getElementById('positions-toggle-icon'); if (!section || !icon) return; const isOpen = section.style.display === 'block';
+             if (isOpen) { section.style.display = 'none'; icon.classList.remove('open'); icon.innerHTML = '<path d="m6 9 6 6 6-6"/>'; }
+             else { section.style.display = 'block'; icon.classList.add('open'); icon.innerHTML = '<path d="m18 15-6-6-6 6"/>'; section.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
         }
 
         function toggleAddAccountForm(is_editing = false) {
-            const section = document.getElementById('add-account-section');
-            if (!section) return;
-            if (section.style.display === 'none' || is_editing) {
-                section.style.display = 'block';
-                if(is_editing) { section.scrollIntoView({ behavior: 'smooth' }); }
-            } else {
-                section.style.display = 'none';
-                resetAccountForm();
-            }
+             const section = document.getElementById('add-account-section'); if (!section) return; if (section.style.display === 'none' || is_editing) { section.style.display = 'block'; if(is_editing) { section.scrollIntoView({ behavior: 'smooth' }); } } else { section.style.display = 'none'; resetAccountForm(); }
         }
 
         function toggleNotificationsForm() {
-            const section = document.getElementById('notifications-section');
-            if (!section) return;
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                 section.scrollIntoView({ behavior: 'smooth' });
-            } else {
-                section.style.display = 'none';
-            }
+             const section = document.getElementById('notifications-section'); if (!section) return; if (section.style.display === 'none') { section.style.display = 'block'; section.scrollIntoView({ behavior: 'smooth' }); } else { section.style.display = 'none'; }
         }
 
         function resetAccountForm() {
-            const form = document.getElementById('account-form');
-            if (!form) return;
-            form.reset();
-            const title = document.getElementById('account-form-title');
-            if (title) title.innerText = 'Adicionar Nova Conta';
-            const originalNameInput = document.getElementById('original_account_name');
-            if (originalNameInput) originalNameInput.value = '';
-            const exchangeSelect = form.querySelector('select[name="exchange_name"]');
-            if (exchangeSelect) {
-                 exchangeSelect.selectedIndex = 0;
-                 toggleCredentialFields(exchangeSelect.value);
-            }
-             form.querySelectorAll('input[type="password"]').forEach(input => input.value = '');
+             const form = document.getElementById('account-form'); if (!form) return; form.reset(); const title = document.getElementById('account-form-title'); if (title) title.innerText = 'Adicionar Nova Conta'; const originalNameInput = document.getElementById('original_account_name'); if (originalNameInput) originalNameInput.value = ''; const exchangeSelect = form.querySelector('select[name="exchange_name"]'); if (exchangeSelect) { exchangeSelect.selectedIndex = 0; toggleCredentialFields(exchangeSelect.value); } form.querySelectorAll('input[type="password"]').forEach(input => input.value = '');
         }
 
         function toggleCredentialFields(exchangeName) {
-            const pacificaFields = document.getElementById('pacifica-fields');
-            const apexFields = document.getElementById('apex-fields');
-            const pacificaInputs = document.querySelectorAll('.pacifica-required');
-            const apexInputs = document.querySelectorAll('.apex-required');
-            const isEditing = !!document.getElementById('original_account_name')?.value;
-
-            if (pacificaFields) pacificaFields.style.display = exchangeName === 'pacifica' ? 'block' : 'none';
-            if (apexFields) apexFields.style.display = exchangeName === 'apex' ? 'block' : 'none';
-
-            pacificaInputs.forEach(input => { input.required = (exchangeName === 'pacifica') && (!isEditing || input.name === 'main_public_key'); });
-            apexInputs.forEach(input => {
-                 const isSecretField = ['api_secret', 'passphrase', 'zk_seeds', 'zk_l2key'].includes(input.name);
-                 input.required = (exchangeName === 'apex') && (!isEditing || !isSecretField);
-            });
+             const pacificaFields = document.getElementById('pacifica-fields'); const apexFields = document.getElementById('apex-fields'); const pacificaInputs = document.querySelectorAll('.pacifica-required'); const apexInputs = document.querySelectorAll('.apex-required'); const isEditing = !!document.getElementById('original_account_name')?.value;
+             if (pacificaFields) pacificaFields.style.display = exchangeName === 'pacifica' ? 'block' : 'none'; if (apexFields) apexFields.style.display = exchangeName === 'apex' ? 'block' : 'none';
+             pacificaInputs.forEach(input => { input.required = (exchangeName === 'pacifica') && (!isEditing || input.name === 'main_public_key'); }); apexInputs.forEach(input => { const isSecretField = ['api_secret', 'passphrase', 'zk_seeds', 'zk_l2key'].includes(input.name); input.required = (exchangeName === 'apex') && (!isEditing || !isSecretField); });
         }
 
         function editAccount(accountData) {
-            const form = document.getElementById('account-form');
-            if (!form) return;
-            resetAccountForm();
-            const exchangeSelect = form.querySelector('[name="exchange_name"]');
-            const title = document.getElementById('account-form-title');
-            if (title) title.innerText = 'Editar Conta: ' + accountData.account_name;
-            form.querySelector('[name="original_account_name"]').value = accountData.account_name;
-            form.querySelector('[name="account_name"]').value = accountData.account_name;
-            if (exchangeSelect) exchangeSelect.value = accountData.exchange_name;
-            form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds;
-            toggleCredentialFields(accountData.exchange_name);
-            if (accountData.exchange_name === 'pacifica') {
-                if(form.querySelector('[name="main_public_key"]')) form.querySelector('[name="main_public_key"]').value = accountData.main_public_key || '';
-            } else if (accountData.exchange_name === 'apex') {
-                if(form.querySelector('[name="api_key"]')) form.querySelector('[name="api_key"]').value = accountData.api_key || '';
-            }
-            toggleCredentialFields(accountData.exchange_name); // Re-aplica a lógica de required
-            toggleAddAccountForm(true);
+             const form = document.getElementById('account-form'); if (!form) return; resetAccountForm(); const exchangeSelect = form.querySelector('[name="exchange_name"]'); const title = document.getElementById('account-form-title');
+             if (title) title.innerText = 'Editar Conta: ' + accountData.account_name; form.querySelector('[name="original_account_name"]').value = accountData.account_name; form.querySelector('[name="account_name"]').value = accountData.account_name; if (exchangeSelect) exchangeSelect.value = accountData.exchange_name; form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds; toggleCredentialFields(accountData.exchange_name);
+             if (accountData.exchange_name === 'pacifica') { if(form.querySelector('[name="main_public_key"]')) form.querySelector('[name="main_public_key"]').value = accountData.main_public_key || ''; } else if (accountData.exchange_name === 'apex') { if(form.querySelector('[name="api_key"]')) form.querySelector('[name="api_key"]').value = accountData.api_key || ''; }
+             toggleCredentialFields(accountData.exchange_name); toggleAddAccountForm(true);
         }
 
-        // --- DOMContentLoaded Original (Ajustado) ---
-         document.addEventListener('DOMContentLoaded', () => {
-            // Configuração inicial dos formulários e seções colapsáveis
-            const accountFormExchangeSelect = document.querySelector('#account-form select[name="exchange_name"]');
-            if (accountFormExchangeSelect) { toggleCredentialFields(accountFormExchangeSelect.value); }
-            const setupFormExitSelect = document.querySelector('#setup-form select[name="exit_mode"]');
-            if(setupFormExitSelect) {
-                toggleTslSection(setupFormExitSelect.value);
-                 const tslTypeSelect = document.querySelector('#setup-form select[name="tsl_type"]');
-                 if(tslTypeSelect) { toggleTslOptions(tslTypeSelect.value); }
-            }
-            const positionsSection = document.getElementById('positions-section');
-            if (positionsSection) positionsSection.style.display = 'none';
-            const setupFormSection = document.getElementById('add-setup-form-section');
-            if (setupFormSection) setupFormSection.style.display = 'none';
-            document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('[id^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
-            {% if backtest_result %}
-                const setupForm = document.getElementById('add-setup-form-section');
-                if (setupForm) {
-                    setupForm.style.display = 'block';
-                     const baseCurrencyInput = setupForm.querySelector('input[name="base_currency"]');
-                     if (baseCurrencyInput && "{{ last_backtest_symbol }}") {
-                         baseCurrencyInput.value = "{{ last_backtest_symbol }}".split('/')[0];
-                     }
-                    setupForm.scrollIntoView({ behavior: 'smooth' });
-                }
-            {% endif %}
-             const positionsToggleIcon = document.getElementById('positions-toggle-icon');
-             if (positionsToggleIcon) { positionsToggleIcon.innerHTML = '<path d="m6 9 6 6 6-6"/>'; }
+        // --- Objeto Global para Compartilhamento (Logs <-> Gráfico) ---
+        // Definido aqui para ser acessível antes do DOMContentLoaded
+        window.logPanelGlobals = {
+            accountColors: {}, // Será preenchido pela lógica de logs
+            colorPalette: ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#64748b'],
+            colorIndex: 0
+        };
 
-             // *** A lógica de popular o filtro de logs JÁ ESTÁ no outro DOMContentLoaded ***
-        });
+        // --- Função Async para Mostrar Gráfico (Definida Globalmente) ---
+        async function showPnlChart() {
+            const modal = document.getElementById('pnlChartModal');
+            const canvas = document.getElementById('pnlChartCanvas');
+            const errorMsg = document.getElementById('pnlChartError');
+            const ctx = canvas?.getContext('2d');
+            if (!modal || !canvas || !ctx || !errorMsg) { console.error("Elementos do modal PNL não encontrados."); return; }
+
+            modal.style.display = 'flex'; errorMsg.style.display = 'none'; canvas.style.display = 'block';
+            const container = canvas.closest('.chart-container'); if(container) container.style.display = 'block';
+            errorMsg.textContent = "Carregando dados do gráfico..."; errorMsg.style.color = "#94a3b8"; errorMsg.style.display = 'block';
+
+            if (pnlChartInstance) { pnlChartInstance.destroy(); pnlChartInstance = null; }
+
+            try {
+                const response = await fetch(`/api/pnl_chart_data`);
+                if (!response.ok) { let eT = `Erro ${response.status}`; try { const d=await response.json(); eT = d.error||eT; } catch(e){} throw new Error(eT); }
+                const chartDataFromServer = await response.json();
+                if (!chartDataFromServer || !chartDataFromServer.labels || !chartDataFromServer.datasets || chartDataFromServer.datasets.length === 0) { throw new Error("Dados PNL inválidos ou vazios."); }
+                errorMsg.style.display = 'none';
+
+                const chartColorsFallback = ['rgb(75, 192, 192)', 'rgb(255, 99, 132)', 'rgb(54, 162, 235)', 'rgb(255, 205, 86)', 'rgb(153, 102, 255)', 'rgb(255, 159, 64)'];
+                let colorIdx = 0;
+                // Usa window.logPanelGlobals.accountColors
+                const processedDatasets = chartDataFromServer.datasets.map(dataset => {
+                     let accountColor = window.logPanelGlobals.accountColors[dataset.label];
+                      if (!accountColor) { accountColor = chartColorsFallback[colorIdx % chartColorsFallback.length]; colorIdx++; }
+                     return { ...dataset, borderColor: accountColor, backgroundColor: hexToRgba(accountColor, 0.1), fill: false, borderWidth: 1.5 };
+                });
+
+                pnlChartInstance = new Chart(ctx, {
+                    type: 'line', data: { labels: chartDataFromServer.labels, datasets: processedDatasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { type: 'time', time:{unit:'day',tooltipFormat:'dd/MM/yyyy',displayFormats:{day:'dd/MM'}}, title:{display:false}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#94a3b8'} }, y: { title:{display:false}, ticks:{callback:(v)=>'$'+v.toFixed(0),color:'#94a3b8'}, grid:{color:'rgba(255,255,255,0.05)'} } },
+                         plugins: { tooltip:{callbacks:{label:(c)=>`${c.dataset.label||''}: $${c.parsed.y?.toFixed(2)||'0.00'}`}}, legend:{position:'bottom',align:'start',labels:{boxWidth:12,padding:15,color:'#cbd5e1'}} }
+                    }
+                });
+            } catch (error) {
+                console.error("Erro PNL Chart:", error); errorMsg.textContent = `Erro: ${error.message}`;
+                errorMsg.style.color = "#f87171"; errorMsg.style.display = 'block'; canvas.style.display = 'none';
+                 if(container) container.style.display = 'block';
+            }
+        }
+
+
+        // --- Listener Principal DOMContentLoaded ---
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- Estado e Refs do Painel de Logs (local ao DOMContentLoaded) ---
+            let allLogs = [];
+            let filteredLogs = [];
+            let isPaused = false;
+            let isAutoScroll = true;
+            const MAX_LOGS_DISPLAY = 500;
+            // Refs do DOM (Logs)
+            const logWindow = document.getElementById('log-window');
+            const noResultsMsg = document.getElementById('log-no-results');
+            const countAll = document.getElementById('log-count-all');
+            const countInfo = document.getElementById('log-count-info');
+            const countSuccess = document.getElementById('log-count-success');
+            const countWarning = document.getElementById('log-count-warning');
+            const countError = document.getElementById('log-count-error');
+            const searchInput = document.getElementById('log-search-input');
+            const levelFilter = document.getElementById('log-level-filter');
+            const accountFilter = document.getElementById('log-account-filter'); // Filtro de conta dos LOGS
+            const autoScrollBtn = document.getElementById('log-autoscroll-btn');
+            const pauseBtn = document.getElementById('log-pause-btn');
+            const pauseIcon = document.getElementById('log-pause-icon');
+            const playIcon = document.getElementById('log-play-icon');
+            const pauseText = document.getElementById('log-pause-text');
+            const copyBtn = document.getElementById('log-copy-btn');
+            const downloadBtn = document.getElementById('log-download-btn');
+            const statusIndicator = document.getElementById('log-status-indicator');
+            const statusText = document.getElementById('log-status-text');
+            const countShowing = document.getElementById('log-count-showing');
+            const countTotal = document.getElementById('log-count-total');
+
+            // --- Popular Filtro de Conta (Logs) Estaticamente ---
+            // (Já feito fora do DOMContentLoaded, usando window.logPanelGlobals)
+            // Apenas garante que a seleção inicial esteja correta
+            if(accountFilter) accountFilter.value = 'ALL';
+            if(levelFilter) levelFilter.value = 'ALL';
+
+            // --- Conexão SocketIO (Logs) ---
+            const socket = io();
+            socket.on('connect', () => { console.log('Log Socket Conectado!'); statusIndicator.classList.add('active'); statusIndicator.classList.remove('paused'); });
+            socket.on('disconnect', () => { console.warn('Log Socket Desconectado!'); statusText.textContent = 'Desconectado.'; statusIndicator.classList.remove('active'); statusIndicator.classList.add('paused'); });
+            socket.on('initial_logs', (initialLogs) => {
+                console.log(`Recebido histórico de ${initialLogs.length} logs.`); allLogs = initialLogs;
+                // Garante que filtros sejam resetados antes de renderizar
+                if(accountFilter) accountFilter.value = 'ALL';
+                if(levelFilter) levelFilter.value = 'ALL';
+                if(searchInput) searchInput.value = '';
+                renderLogs();
+                statusText.textContent = 'Conectado. Logs ativos.';
+            });
+            socket.on('new_log', (log) => {
+                allLogs.push(log);
+                 // Define a cor se necessário, usando o objeto global
+                 if (log.account && !window.logPanelGlobals.accountColors[log.account]) {
+                     window.logPanelGlobals.accountColors[log.account] = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length];
+                     window.logPanelGlobals.colorIndex++;
+                 }
+                if (!isPaused) {
+                    const isVisible = isLogVisible(log, searchInput.value, levelFilter.value, accountFilter.value);
+                    if (isVisible) { appendLogLine(log); limitDOMLogs(); } // limitDOMLogs chama scroll
+                    updateCounters(); updateFooterStats(); // Atualiza sempre
+                } else { updateCounters(); updateFooterStats(); }
+            });
+
+             // --- Funções Internas do Painel de Logs (definidas dentro do DOMContentLoaded) ---
+            // (Estas funções podem ficar aqui, pois só são chamadas internamente ou pelos listeners abaixo)
+            function renderLogs() {
+                const searchTerm = searchInput.value.toLowerCase(); const selectedLevel = levelFilter.value; const selectedAccount = accountFilter.value;
+                filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
+                const logsToDisplay = filteredLogs.slice(-MAX_LOGS_DISPLAY); logWindow.innerHTML = '';
+                if (logsToDisplay.length > 0) {
+                    const fragment = document.createDocumentFragment(); logsToDisplay.forEach(log => fragment.appendChild(createLogLineElement(log)));
+                    logWindow.appendChild(fragment); logWindow.style.display = 'block'; noResultsMsg.style.display = 'none';
+                } else if (allLogs.length > 0) { logWindow.style.display = 'none'; noResultsMsg.style.display = 'block'; }
+                else { logWindow.style.display = 'block'; noResultsMsg.style.display = 'none'; }
+                updateCounters(); updateFooterStats(logsToDisplay.length);
+                 // Não scrolla aqui, deixa limitDOMLogs cuidar
+            }
+            function appendLogLine(log) {
+                if (searchInput.value) { renderLogs(); return; } // Re-renderiza se busca ativa
+                logWindow.style.display = 'block'; noResultsMsg.style.display = 'none';
+                const logElement = createLogLineElement(log); logWindow.appendChild(logElement);
+                 // Scroll e limite são chamados por limitDOMLogs
+            }
+             function limitDOMLogs() {
+                let logsRemoved = 0;
+                while (logWindow.childElementCount > MAX_LOGS_DISPLAY && !searchInput.value) { if(logWindow.firstChild){ logWindow.removeChild(logWindow.firstChild); logsRemoved++; } else { break; } }
+                updateFooterStats(); // Atualiza contagem exibida
+                if (isAutoScroll) { scrollToBottom(); } // Scroll só se autoscroll ativo
+            }
+            function createLogLineElement(log) {
+                const line = document.createElement('div'); line.className = 'log-line'; line.dataset.level = log.level;
+                const icon = getLevelIcon(log.level); const timestamp = `<span class="log-timestamp">${log.timestamp}</span>`; const badge = getAccountBadge(log.account); // Chama função global
+                const searchTerm = searchInput.value; let message = log.is_html ? log.message : escapeHTML(log.message || ''); // Usa função global
+                if (searchTerm && !log.is_html && message) {
+                    try {
+                        const tempDiv = document.createElement('div'); tempDiv.innerHTML = message; const textNodes = getTextNodes(tempDiv); const regex = new RegExp(escapeRegExp(searchTerm), 'gi'); // Usa função global
+                        textNodes.forEach(node => { const parent = node.parentNode; if (!parent) return; const text = node.nodeValue; let lastIndex = 0; let match; const fragment = document.createDocumentFragment();
+                            while ((match = regex.exec(text)) !== null) { fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index))); const mark = document.createElement('mark'); mark.textContent = match[0]; fragment.appendChild(mark); lastIndex = regex.lastIndex; }
+                            fragment.appendChild(document.createTextNode(text.substring(lastIndex))); if (node.parentNode === parent) { parent.replaceChild(fragment, node); }
+                        }); message = tempDiv.innerHTML;
+                    } catch (e) { console.error("Highlight Error:", e); }
+                }
+                line.innerHTML = `${icon}${timestamp}${badge}<span class="log-message">${message}</span>`; return line;
+            }
+            function getTextNodes(node) { const tN = []; const w = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false); let cN; while(cN = w.nextNode()){ if (cN.parentNode && cN.parentNode.nodeName !== 'SCRIPT' && cN.parentNode.nodeName !== 'STYLE') { tN.push(cN); } } return tN; }
+            function updateCounters() { let i=0, s=0, w=0, e=0; allLogs.forEach(l => { switch(l.level){ case 'INFO': i++; break; case 'SUCCESS': s++; break; case 'WARNING': w++; break; case 'ERROR': e++; break; }}); countAll.textContent = allLogs.length; countInfo.textContent = i; countSuccess.textContent = s; countWarning.textContent = w; countError.textContent = e; }
+            function updateFooterStats(showing = null) { countShowing.textContent = showing ?? logWindow.childElementCount; countTotal.textContent = allLogs.length; }
+            function scrollToBottom() { const isAtBottom = logWindow.scrollHeight - logWindow.clientHeight <= logWindow.scrollTop + 15; if (isAutoScroll || isAtBottom) { const last = logWindow.lastElementChild; if(last) last.scrollIntoView({ behavior: 'auto', block: 'end' }); } }
+            function getLevelIcon(l) { let c="log-icon", t=''; switch(l){ case 'INFO': t='<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'; break; case 'SUCCESS': t='<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'; break; case 'WARNING': t='<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'; break; case 'ERROR': t='<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'; break; default: c+=" text-purple-400"; t='<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'; } return `<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>${l}</title>${t}</svg>`; }
+            function getAccountBadge(a) { if (!a) return ''; let bC = window.logPanelGlobals.accountColors[a]; if (!bC){ bC = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length]; window.logPanelGlobals.accountColors[a] = bC; window.logPanelGlobals.colorIndex++; } const bg = hexToRgba(bC, 0.15); const fg = lightenHexColor(bC, 65); return `<span class="log-account-badge" style="background-color:${bg};color:${fg};border-color:${fg};">${escapeHTML(a)}</span>`; }
+            function isLogVisible(l, sT, sL, sA) { if(!l) return false; const lM=sL==='ALL'||l.level===sL; const aM=sA==='ALL'||l.account===sA; const sS=sT||''; const sM=!sS||(l.timestamp&&l.timestamp.includes(sS))||(l.account&&l.account.toLowerCase().includes(sS))||(l.message&&l.message.toLowerCase().includes(sS)); return lM&&aM&&sM; }
+            function toggleAutoScroll() { isAutoScroll=!isAutoScroll; autoScrollBtn.classList.toggle('active', isAutoScroll); if(isAutoScroll) scrollToBottom(); }
+            function togglePause() { isPaused=!isPaused; pauseBtn.classList.toggle('active', isPaused); if(isPaused){ pauseText.textContent='Retomar'; pauseIcon.style.display='none'; playIcon.style.display='inline-block'; statusText.textContent='Pausados.'; statusIndicator.classList.remove('active'); statusIndicator.classList.add('paused'); } else { pauseText.textContent='Pausar'; pauseIcon.style.display='inline-block'; playIcon.style.display='none'; statusText.textContent='Conectado.'; statusIndicator.classList.add('active'); statusIndicator.classList.remove('paused'); renderLogs(); }}
+            function logToText(l) { if(!l)return""; let m=l.message||""; if(l.is_html){ const d=document.createElement('div'); d.innerHTML=m; const p=d.querySelector('pre'); m=p?(p.textContent||p.innerText||''):(d.textContent||d.innerText||''); } m=m.replace(/\s+/g,' ').trim(); return`[${l.timestamp||'N/A'}] [${l.account||'N/A'}] [${l.level||'N/A'}] ${m}`; }
+            function copyLogs() { const t=filteredLogs.map(logToText).join('\n'); navigator.clipboard.writeText(t).then(()=>{alert(`${filteredLogs.length} logs copiados!`);}).catch(e=>{console.error('Copy Error:',e);alert('Falha ao copiar.');}); }
+            function downloadLogs() { const t=filteredLogs.map(logToText).join('\n'); const b=new Blob([t],{type:'text/plain;charset=utf-8'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); const ts=new Date().toISOString().replace(/[:.]/g,'-'); a.href=u; a.download=`kbot-logs-${ts}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); }
+
+            // --- Bind de Eventos (Logs) ---
+            let searchTimeout;
+            if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(renderLogs, 250); });
+            if (levelFilter) levelFilter.addEventListener('change', renderLogs);
+            if (accountFilter) accountFilter.addEventListener('change', renderLogs); // Filtro de conta dos LOGS
+            if (autoScrollBtn) autoScrollBtn.addEventListener('click', toggleAutoScroll);
+            if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
+            if (copyBtn) copyBtn.addEventListener('click', copyLogs);
+            if (downloadBtn) downloadBtn.addEventListener('click', downloadLogs);
+             if (logWindow) logWindow.addEventListener('scroll', () => { if (logWindow.scrollTop < logWindow.scrollHeight - logWindow.clientHeight - 50 && isAutoScroll) { isAutoScroll = false; if(autoScrollBtn) autoScrollBtn.classList.remove('active'); } });
+
+             // --- Inicialização Geral da Página (Original + Gráfico) ---
+            const accountFormExchangeSelect = document.querySelector('#account-form select[name="exchange_name"]'); if (accountFormExchangeSelect) { toggleCredentialFields(accountFormExchangeSelect.value); }
+            const setupFormExitSelect = document.querySelector('#setup-form select[name="exit_mode"]'); if(setupFormExitSelect) { toggleTslSection(setupFormExitSelect.value); const tslTypeSelect = document.querySelector('#setup-form select[name="tsl_type"]'); if(tslTypeSelect) { toggleTslOptions(tslTypeSelect.value); } }
+            const positionsSection = document.getElementById('positions-section'); if (positionsSection) positionsSection.style.display = 'none';
+            const setupFormSection = document.getElementById('add-setup-form-section'); if (setupFormSection) setupFormSection.style.display = 'none';
+            document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none'); document.querySelectorAll('[id^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
+            {% if backtest_result %} const setupForm = document.getElementById('add-setup-form-section'); if (setupForm) { setupForm.style.display = 'block'; const baseCurrencyInput = setupForm.querySelector('input[name="base_currency"]'); if (baseCurrencyInput && "{{ last_backtest_symbol }}") { baseCurrencyInput.value = "{{ last_backtest_symbol }}".split('/')[0]; } setupForm.scrollIntoView({ behavior: 'smooth' }); } {% endif %}
+             const positionsToggleIcon = document.getElementById('positions-toggle-icon'); if (positionsToggleIcon) { positionsToggleIcon.innerHTML = '<path d="m6 9 6 6 6-6"/>'; }
+
+             // Listeners Gráfico PNL
+             const pnlCardElement = document.getElementById('pnl-card'); if (pnlCardElement) { pnlCardElement.addEventListener('click', showPnlChart); } // Chama função global
+             const pnlModal = document.getElementById('pnlChartModal'); if(pnlModal) { pnlModal.addEventListener('click', (event) => { if (event.target === pnlModal) { closePnlChartModal(); } }); } // Chama função global
+             const closeButton = pnlModal?.querySelector('button'); // Seleciona o primeiro botão dentro do modal
+             if (closeButton) {
+                 // Remove o onclick inline para evitar duplicação (caso ainda exista)
+                 closeButton.removeAttribute('onclick');
+                 closeButton.addEventListener('click', closePnlChartModal); // Chama função global
+             }
+
+             // Renderiza logs iniciais (após setup dos filtros)
+             renderLogs();
+        }); // Fim do DOMContentLoaded principal
+
     </script>
 </body>
 </html>

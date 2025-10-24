@@ -22,7 +22,7 @@ from bot_logic import TradingBot
 from strategies import STRATEGIES
 from exchange_factory import get_client
 from backtester import run_full_backtest
-from database import init_db, sync_order_history, sync_trade_history, sync_pnl_history
+from database import init_db, sync_order_history, sync_trade_history, sync_pnl_history, query_daily_pnl_all_accounts
 from notifications import check_and_send_close_alerts, check_and_send_open_alerts, check_and_send_close_alerts_apex
 
 app = Flask(__name__)
@@ -372,13 +372,12 @@ def _adapt_pnl_history_for_dashboard(pnl_history: list) -> list:
     """Adapta o formato do histórico de PNL da Apex para o formato esperado pela função de cálculo de métricas."""
     adapted_trades = []
     for pnl_entry in pnl_history:
-        if pnl_entry.get('type') == 'CLOSE_POSITION':
-            adapted_trades.append({
-                'pnl': float(pnl_entry.get('totalPnl') or 0.0),
-                'side': 'close_position',
-                'fee': float(pnl_entry.get('fee') or 0.0),
-                'order_id': pnl_entry.get('tradeId')  # Usa tradeId como agrupador se disponível
-            })
+        adapted_trades.append({
+            'pnl': float(pnl_entry.get('totalPnl') or 0.0),
+            'side': 'close_' + pnl_entry.get('side').lower(),
+            'fee': float(pnl_entry.get('fee') or 0.0),
+            'order_id': pnl_entry.get('id')  # Usa tradeId como agrupador se disponível
+        })
     return adapted_trades
 
 
@@ -914,6 +913,72 @@ def process_setup_form():
         return redirect(url_for('index',
                                 last_backtest_symbol=symbol if 'symbol' in locals() else base_currency_form))  # Garante que o símbolo vá para a URL
 
+@app.route('/api/pnl_chart_data')
+def get_pnl_chart_data():
+    # --- INÍCIO DA MODIFICAÇÃO (Buscar 30 dias) ---
+    log.info(f"Buscando dados do gráfico PNL (30 dias) via query unificada...")
+
+    end_time = datetime.now()
+    # Define o início da busca para 30 dias atrás
+    start_time_30d = end_time - timedelta(days=30)
+    start_time_30d_ms = int(start_time_30d.timestamp() * 1000)
+    # --- FIM DA MODIFICAÇÃO ---
+
+    try:
+        # Chama a função do database.py que retorna todos os dados necessários dos últimos 30 dias
+        all_pnl_data = query_daily_pnl_all_accounts(start_time_30d_ms) # Passa o timestamp de 30 dias
+
+        if not all_pnl_data:
+            log.warning("Nenhum dado PNL encontrado pela query unificada nos últimos 30 dias.")
+            # Retorna dados vazios para o gráfico exibir 'sem dados' em vez de erro 404
+            return jsonify({"labels": [], "datasets": []})
+            # return jsonify({"error": "Nenhum dado PNL encontrado nos últimos 30 dias."}), 404 # Alternativa
+
+        pnl_df = pd.DataFrame(all_pnl_data)
+        pnl_df['date'] = pd.to_datetime(pnl_df['date'])
+        pnl_df['daily_pnl'] = pd.to_numeric(pnl_df['daily_pnl'], errors='coerce').fillna(0)
+
+        # --- INÍCIO DA MODIFICAÇÃO (Processamento para 30 dias) ---
+        # Cria o range de datas completo dos últimos 30 dias
+        date_range_30d = pd.date_range(start=start_time_30d.date(), end=end_time.date(), freq='D')
+
+        chart_labels = [date.strftime('%Y-%m-%d') for date in date_range_30d]
+        chart_datasets = []
+
+        account_names_in_data = sorted(pnl_df['account_name'].unique())
+
+        # Processa cada conta encontrada nos dados
+        for account_name in account_names_in_data:
+            account_df = pnl_df[pnl_df['account_name'] == account_name].set_index('date')
+
+            # Cria a série temporal de 30 dias, preenchendo dias faltantes com 0
+            pnl_series_30d = account_df['daily_pnl'].reindex(date_range_30d, fill_value=0)
+
+            # Calcula o cumulativo diretamente sobre os 30 dias
+            cumulative_pnl_30d = pnl_series_30d.cumsum()
+
+            # Prepara os dados para o dataset desta conta (não precisa mais ser relativo)
+            account_data = [round(pnl, 2) for pnl in cumulative_pnl_30d.values]
+            # --- FIM DA MODIFICAÇÃO ---
+
+            chart_datasets.append({
+                "label": account_name,
+                "data": account_data,
+                "tension": 0.1,
+                "pointRadius": 2,
+                "pointHoverRadius": 5
+            })
+
+        final_chart_data = {
+            "labels": chart_labels,
+            "datasets": chart_datasets
+        }
+
+        return jsonify(final_chart_data)
+
+    except Exception as e:
+        log.error(f"Erro ao processar dados PNL da query unificada: {e}", exc_info=True)
+        return jsonify({"error": "Erro interno ao processar dados do gráfico."}), 500
 
 if __name__ == '__main__':
     setup_logging()  # Configura o logging antes de tudo
