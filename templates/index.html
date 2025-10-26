@@ -465,15 +465,24 @@
                         <tbody>
                             {% for pos in open_positions_details %}
                             <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
-                                <td class="py-3 px-3">{{ pos.account_name }}</td><td class="py-3 px-3">{{ pos.symbol }}</td>
+                                <td class="py-3 px-3">{{ pos.account_name }}</td>
+                                <td class="py-3 px-3">{{ pos.symbol }}</td>
                                 <td class="py-3 px-3"><span class="{{ 'text-green-400' if pos.side == 'bid' else 'text-red-400' }}">{{ 'Long' if pos.side == 'bid' else 'Short' }}</span></td>
-                                <td class="py-3 px-3">{{ pos.amount | float }}</td><td class="py-3 px-3">${{ pos.entry_price|float }}</td><td class="py-3 px-3">${{ pos.current_price|float }}</td>
-                                <td class="py-3 px-3 {{ 'text-green-400' if pos.pnl_percentage >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(pos.pnl_percentage) }}%</td>
+                                <td class="py-3 px-3">{{ pos.amount | float }}</td>
+                                <td class="py-3 px-3">${{ pos.entry_price|float }}</td>
+                                <td class="py-3 px-3">${{ pos.current_price|float }}</td>
+                                <td class="py-3 px-3 {{ 'text-green-400' if pos.pnl_usd >= 0 else 'text-red-400' }}">
+                                    {% if pos.pnl_usd >= 0 %}+{% endif %}${{ "%.2f"|format(pos.pnl_usd) }} ({{ "%+.2f"|format(pos.pnl_percentage) }}%)
+                                </td>
                                 <td class="py-3 px-3">${{ pos.sl_price|float if pos.sl_price != 'N/A' else '-' }} / ${{ pos.tp_price|float if pos.tp_price != 'N/A' else '-' }}</td>
                                 <td class="py-3 px-3">{{ pos.creation_date_utc }}</td>
                             </tr>
-                            {% else %}<tr><td colspan="9" class="text-center py-4 text-gray-400">Nenhuma posição aberta.</td></tr>{% endfor %}
-                        </tbody>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-gray-400">Nenhuma posição aberta.</td>
+                            </tr>
+                            {% endfor %}
+                    </tbody>
                     </table>
                 </div>
             </div>
@@ -851,7 +860,7 @@
     <div id="pnlChartModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50" style="display: none;">
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-3xl relative">
         <button onclick="closePnlChartModal()" class="absolute top-3 right-4 text-slate-400 hover:text-white text-2xl font-bold">&times;</button>
-        <h3 class="text-lg font-semibold mb-4 text-center">PNL Acumulado Relativo - Últimos 30 Dias</h3>
+        <h3 class="text-lg font-semibold mb-4 text-center">PNL Acumulado - Últimos 30 Dias</h3>
         <div class="chart-container relative h-64 md:h-96">
             <canvas id="pnlChartCanvas"></canvas>
         </div>
@@ -1102,11 +1111,59 @@
             const countShowing = document.getElementById('log-count-showing');
             const countTotal = document.getElementById('log-count-total');
 
-            // --- Popular Filtro de Conta (Logs) Estaticamente ---
-            // (Já feito fora do DOMContentLoaded, usando window.logPanelGlobals)
-            // Apenas garante que a seleção inicial esteja correta
-            if(accountFilter) accountFilter.value = 'ALL';
-            if(levelFilter) levelFilter.value = 'ALL';
+            try {
+                // Pega a variável 'accounts' passada pelo Flask/Jinja2
+                const registeredAccountsData = {{ accounts | tojson | safe }};
+
+                if (registeredAccountsData && Array.isArray(registeredAccountsData)) {
+                    const accountNames = registeredAccountsData
+                        .map(acc => acc.account_name)
+                        .filter(Boolean) // Remove nulos/vazios
+                        .sort(); // Ordena
+
+                    console.log("Contas Cadastradas para Filtro:", accountNames); // Log Debug
+
+                    // Limpa opções existentes (exceto a primeira "TODAS")
+                    while (accountFilter.options.length > 1) {
+                        accountFilter.remove(1);
+                    }
+
+                    // Cria e adiciona as novas opções
+                    const accountFragment = document.createDocumentFragment();
+                    accountNames.forEach(accName => {
+                        const option = document.createElement('option');
+                        option.value = accName;
+                        option.textContent = accName;
+                        accountFragment.appendChild(option);
+
+                        // Define a cor para o badge (usando o objeto global)
+                        if (!window.logPanelGlobals.accountColors[accName]) {
+                            window.logPanelGlobals.accountColors[accName] = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length];
+                            window.logPanelGlobals.colorIndex++;
+                        }
+                    });
+                    accountFilter.appendChild(accountFragment); // Adiciona as opções de contas
+                    accountFilter.value = 'ALL'; // Garante que "TODAS" esteja selecionado inicialmente
+
+                } else {
+                     console.warn("Variável 'accounts' não encontrada ou inválida no template.");
+                     // Mantém apenas a opção "TODAS"
+                     accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>';
+                }
+            } catch (e) {
+                console.error("Erro ao popular filtro de contas:", e);
+                 // Mantém apenas a opção "TODAS" em caso de erro
+                 accountFilter.innerHTML = '<option value="ALL">Conta: TODAS</option>';
+                 // Pode adicionar uma opção de erro se preferir
+            }
+
+            // Garante cores para loggers internos
+             ['Sistema', 'Backtester', 'werkzeug', 'socketio', 'engineio'].forEach(internalName => {
+                 if (!window.logPanelGlobals.accountColors[internalName]) {
+                      window.logPanelGlobals.accountColors[internalName] = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length];
+                      window.logPanelGlobals.colorIndex++;
+                 }
+             });
 
             // --- Conexão SocketIO (Logs) ---
             const socket = io();

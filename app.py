@@ -433,10 +433,22 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
 
             for pos in open_positions_list:
                 symbol, entry_price = pos.get('symbol', 'N/A').upper(), float(pos.get('entry_price', 0))
+                amount = float(pos.get('amount', 0))
                 if symbol == 'N/A' or entry_price == 0: continue  # Pula posição inválida
 
                 leverage = leverage_map.get(symbol.split('-')[0], 1)  # Usa base currency para leverage
                 current_price = prices_map.get(symbol.split('-')[0], 0.0)
+
+                pnl_usd = 0.0
+                if current_price > 0:  # Evita divisão por zero ou cálculo inválido
+                    if pos.get('side') == 'bid':  # Long
+                        pnl_usd = (current_price - entry_price) * amount
+                    else:  # Short
+                        pnl_usd = (entry_price - current_price) * amount
+
+                price_change_pct = ((current_price - entry_price) / entry_price) * 100 if pos.get(
+                    'side') == 'bid' else ((entry_price - current_price) / entry_price) * 100 if entry_price > 0 else 0
+                pnl_pct = price_change_pct * leverage
 
                 sl_order = next((o for o in all_open_orders if
                                  o.get('symbol', '').upper() == symbol and
@@ -445,16 +457,13 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
                                  o.get('symbol', '').upper() == symbol and
                                  o.get('order_type', '').startswith('take_profit')), None)
 
-                price_change_pct = ((current_price - entry_price) / entry_price) * 100 if pos.get(
-                    'side') == 'bid' else ((entry_price - current_price) / entry_price) * 100 if entry_price > 0 else 0
-                pnl_pct = price_change_pct * leverage
-
                 pos.update({
                     'account_name': account_name,
                     'current_price': current_price,
                     'sl_price': float(sl_order['stop_price']) if sl_order and sl_order.get('stop_price') else 'N/A',
                     'tp_price': float(tp_order['stop_price']) if tp_order and tp_order.get('stop_price') else 'N/A',
                     'pnl_percentage': pnl_pct,
+                    'pnl_usd': pnl_usd,
                     'creation_date_utc': pd.to_datetime(pos.get('created_at'), unit='ms').strftime(
                         '%Y-%m-%d %H:%M:%S') if pos.get('created_at') else 'N/A'
                 })
