@@ -13,58 +13,144 @@
             "accounts": [
                 {
                     "account_name": "BOT PACIFICA",
-                    "check_interval_seconds": 180,
                     "main_public_key": "CONFIGURAR",
                     "agent_private_key": "CONFIGURAR",
                     "markets_to_trade": [
                         {
-                            "id": "1759970833303",
+                            "id": "1761216578258",
                             "base_currency": "ETH",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.01,
+                                    "scale_factor": 0.6,
+                                    "max_lock": 0.85
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761216792502",
+                            "base_currency": "SOL",
+                            "quote_currency": "USDT",
+                            "leverage": 20,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.015,
+                                    "scale_factor": 0.8,
+                                    "max_lock": 0.9
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761218222364",
+                            "base_currency": "BTC",
                             "quote_currency": "USDT",
                             "leverage": 50,
                             "strategy_name": "7. Tendencia Confirmada (1h)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.002,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761216672634",
+                            "base_currency": "SUI",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "4. Breakout Curto (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761219162480",
+                            "base_currency": "BNB",
+                            "quote_currency": "USDT",
+                            "leverage": 10,
+                            "strategy_name": "2. Momentum Explosivo (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
                                 "value": 0.02
                             },
                             "take_profit_rrr": 3.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "ema_trail_delay",
+                                "tsl_value": {
+                                    "min_profit_pct": 0.01,
+                                    "delay_bars": 4,
+                                    "safety_buffer_pct": 0.002
+                                },
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760006620984",
-                            "base_currency": "SOL",
+                            "id": "1761220646144",
+                            "base_currency": "XRP",
                             "quote_currency": "USDT",
                             "leverage": 20,
-                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "strategy_name": "1. Tendencia Rapida (15m)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
                                 "value": 0.015
                             },
                             "take_profit_rrr": 2.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760006797698",
-                            "base_currency": "BTC",
-                            "quote_currency": "USDT",
-                            "leverage": 50,
-                            "strategy_name": "3. Scalping Intraday (15m)",
-                            "risk_per_trade": 0.01,
-                            "stop_loss_config": {
-                                "type": "percentage",
-                                "value": 0.015
-                            },
-                            "take_profit_rrr": 2.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "long_short"
-                        },
-                        {
-                            "id": "1760004136730",
-                            "base_currency": "SUI",
+                            "id": "1761223405926",
+                            "base_currency": "LINK",
                             "quote_currency": "USDT",
                             "leverage": 10,
                             "strategy_name": "4. Breakout Curto (15m)",
@@ -73,27 +159,121 @@
                                 "type": "percentage",
                                 "value": 0.015
                             },
-                            "take_profit_rrr": 3.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760006958967",
-                            "base_currency": "BNB",
+                            "id": "1761224240337",
+                            "base_currency": "UNI",
                             "quote_currency": "USDT",
                             "leverage": 10,
-                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "strategy_name": "4. Breakout Curto (15m)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
                                 "value": 0.015
                             },
                             "take_profit_rrr": 2.5,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761225137013",
+                            "base_currency": "LDO",
+                            "quote_currency": "USDT",
+                            "leverage": 10,
+                            "strategy_name": "2. Momentum Explosivo (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761227670546",
+                            "base_currency": "DOGE",
+                            "quote_currency": "USDT",
+                            "leverage": 15,
+                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.015,
+                                    "scale_factor": 0.8,
+                                    "max_lock": 0.9
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761242286659",
+                            "base_currency": "AVAX",
+                            "quote_currency": "USDT",
+                            "leverage": 10,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.03
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761244012857",
+                            "base_currency": "AAVE",
+                            "quote_currency": "USDT",
+                            "leverage": 10,
+                            "strategy_name": "4. Breakout Curto (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.01,
+                                "remove_tp_on_trail": true
+                            }
                         }
                     ],
-                    "notifications_enabled": false
+                    "notifications_enabled": true
                 }
             ]
         },
@@ -102,7 +282,6 @@
             "accounts": [
                 {
                     "account_name": "BOT APEX",
-                    "check_interval_seconds": 180,
                     "api_key": "CONFIGURAR",
                     "api_secret": "CONFIGURAR",
                     "passphrase": "CONFIGURAR",
@@ -110,23 +289,120 @@
                     "zk_l2key": "CONFIGURAR",
                     "markets_to_trade": [
                         {
-                            "id": "1760006633072",
+                            "id": "1761216826754",
                             "base_currency": "SOL",
                             "quote_currency": "USDT",
                             "leverage": 50,
-                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.015,
+                                    "scale_factor": 0.8,
+                                    "max_lock": 0.9
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761216701204",
+                            "base_currency": "SUI",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "4. Breakout Curto (15m)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
                                 "value": 0.015
                             },
                             "take_profit_rrr": 2.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760004744625",
-                            "base_currency": "SUI",
+                            "id": "1761218261426",
+                            "base_currency": "BTC",
+                            "quote_currency": "USDT",
+                            "leverage": 100,
+                            "strategy_name": "7. Tendencia Confirmada (1h)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.002,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761219246053",
+                            "base_currency": "BNB",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "2. Momentum Explosivo (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.02
+                            },
+                            "take_profit_rrr": 3.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "ema_trail_delay",
+                                "tsl_value": {
+                                    "min_profit_pct": 0.01,
+                                    "delay_bars": 4,
+                                    "safety_buffer_pct": 0.002
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761216606664",
+                            "base_currency": "ETH",
+                            "quote_currency": "USDT",
+                            "leverage": 100,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.5,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.01,
+                                    "scale_factor": 0.6,
+                                    "max_lock": 0.85
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761228581544",
+                            "base_currency": "PENDLE",
                             "quote_currency": "USDT",
                             "leverage": 50,
                             "strategy_name": "4. Breakout Curto (15m)",
@@ -136,90 +412,40 @@
                                 "value": 0.015
                             },
                             "take_profit_rrr": 1.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.005,
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760006806764",
-                            "base_currency": "BTC",
+                            "id": "1761229541021",
+                            "base_currency": "AVAX",
                             "quote_currency": "USDT",
-                            "leverage": 100,
-                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "leverage": 50,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
-                                "value": 0.015
+                                "value": 0.03
                             },
                             "take_profit_rrr": 2.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "long_short"
-                        },
-                        {
-                            "id": "1760006992381",
-                            "base_currency": "BNB",
-                            "quote_currency": "USDT",
-                            "leverage": 50,
-                            "strategy_name": "3. Scalping Intraday (15m)",
-                            "risk_per_trade": 0.01,
-                            "stop_loss_config": {
-                                "type": "percentage",
-                                "value": 0.015
-                            },
-                            "take_profit_rrr": 2.5,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
-                        },
-                        {
-                            "id": "1760007429173",
-                            "base_currency": "HYPE",
-                            "quote_currency": "USDT",
-                            "leverage": 50,
-                            "strategy_name": "3. Scalping Intraday (15m)",
-                            "risk_per_trade": 0.01,
-                            "stop_loss_config": {
-                                "type": "percentage",
-                                "value": 0.015
-                            },
-                            "take_profit_rrr": 3.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
-                        },
-                        {
-                            "id": "1760012053034",
-                            "base_currency": "ETH",
-                            "quote_currency": "USDT",
-                            "leverage": 100,
-                            "strategy_name": "7. Tendencia Confirmada (1h)",
-                            "risk_per_trade": 0.01,
-                            "stop_loss_config": {
-                                "type": "percentage",
-                                "value": 0.02
-                            },
-                            "take_profit_rrr": 3.0,
-                            "exit_mode": "ativo",
-                            "direction_mode": "btc_trend"
-                        },
-                        {
-                            "id": "1760012692419",
-                            "base_currency": "ONDO",
-                            "quote_currency": "USDT",
-                            "leverage": 50,
-                            "strategy_name": "2. Momentum Explosivo (15m)",
-                            "risk_per_trade": 0.01,
-                            "stop_loss_config": {
-                                "type": "percentage",
-                                "value": 0.015
-                            },
-                            "take_profit_rrr": 3.0,
                             "exit_mode": "passivo",
-                            "direction_mode": "btc_trend"
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.0,
+                                "remove_tp_on_trail": true
+                            }
                         },
                         {
-                            "id": "1760014095080",
-                            "base_currency": "PENDLE",
+                            "id": "1761230491577",
+                            "base_currency": "ZRO",
                             "quote_currency": "USDT",
                             "leverage": 50,
-                            "strategy_name": "2. Momentum Explosivo (15m)",
+                            "strategy_name": "4. Breakout Curto (15m)",
                             "risk_per_trade": 0.01,
                             "stop_loss_config": {
                                 "type": "percentage",
@@ -227,19 +453,132 @@
                             },
                             "take_profit_rrr": 2.0,
                             "exit_mode": "passivo",
-                            "direction_mode": "btc_trend"
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.01,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761227713863",
+                            "base_currency": "DOGE",
+                            "quote_currency": "USDT",
+                            "leverage": 25,
+                            "strategy_name": "3. Scalping Intraday (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "long_short",
+                            "trailing_stop_config": {
+                                "type": "profit_lock",
+                                "tsl_value": {
+                                    "min_buffer": 0.015,
+                                    "scale_factor": 0.8,
+                                    "max_lock": 0.9
+                                },
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761246107355",
+                            "base_currency": "AAVE",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "4. Breakout Curto (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "high_low_trail",
+                                "tsl_value": 0.01,
+                                "remove_tp_on_trail": true
+                            }
+                        },
+                        {
+                            "id": "1761245081255",
+                            "base_currency": "XRP",
+                            "quote_currency": "USDT",
+                            "leverage": 50,
+                            "strategy_name": "1. Tendencia Rapida (15m)",
+                            "risk_per_trade": 0.01,
+                            "stop_loss_config": {
+                                "type": "percentage",
+                                "value": 0.015
+                            },
+                            "take_profit_rrr": 2.0,
+                            "exit_mode": "passivo",
+                            "direction_mode": "btc_trend",
+                            "trailing_stop_config": {
+                                "type": "atr",
+                                "tsl_value": 2.5,
+                                "remove_tp_on_trail": true
+                            }
                         }
                     ],
-                    "notifications_enabled": false
+                    "notifications_enabled": true
                 }
             ]
         }
     },
     "telegram": {
-        "bot_token": "8145656041:AAHIEPxM5HbBYU6Zgkd3JINDA4yRErKbtq0",
-        "chat_id": "382788881",
-        "enabled": false,
-        "notify_on_open": false,
-        "notify_on_close": false
-    }
+        "bot_token": "CONFIGURAR",
+        "chat_id": "CONFIGURAR",
+        "enabled": true,
+        "notify_on_open": true,
+        "notify_on_close": true
+    },
+    "profit_lock_params": [
+        {
+            "min_buffer": 0.005,
+            "scale_factor": 0.4,
+            "max_lock": 0.7
+        },
+        {
+            "min_buffer": 0.005,
+            "scale_factor": 0.5,
+            "max_lock": 0.8
+        },
+        {
+            "min_buffer": 0.01,
+            "scale_factor": 0.6,
+            "max_lock": 0.85
+        },
+        {
+            "min_buffer": 0.015,
+            "scale_factor": 0.8,
+            "max_lock": 0.9
+        }
+    ],
+    "ema_trail_delay_params": [
+        {
+            "min_profit_pct": 0.005,
+            "delay_bars": 2,
+            "safety_buffer_pct": 0.0015
+        },
+        {
+            "min_profit_pct": 0.008,
+            "delay_bars": 3,
+            "safety_buffer_pct": 0.002
+        },
+        {
+            "min_profit_pct": 0.01,
+            "delay_bars": 4,
+            "safety_buffer_pct": 0.002
+        },
+        {
+            "min_profit_pct": 0.015,
+            "delay_bars": 5,
+            "safety_buffer_pct": 0.0025
+        }
+    ]
 }

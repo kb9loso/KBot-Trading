@@ -1,12 +1,9 @@
-# app.py
 import subprocess
 import numpy as np
 import requests
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-# --- INÍCIO DA MODIFICAÇÃO (Histórico de Logs) ---
 from flask_socketio import SocketIO, emit
 from collections import deque
-# --- FIM DA MODIFICAÇÃO ---
 import json
 import threading
 import time
@@ -25,17 +22,26 @@ from backtester import run_full_backtest
 from database import init_db, sync_order_history, sync_trade_history, sync_pnl_history, query_daily_pnl_all_accounts
 from notifications import check_and_send_close_alerts, check_and_send_open_alerts, check_and_send_close_alerts_apex
 
+import nest_asyncio
+from websocket_manager import WebSocketManager
+
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 socketio = SocketIO(app, async_mode='threading')
+nest_asyncio.apply()
+ws_manager = WebSocketManager()  # Instância global mantida
 
-# --- INÍCIO DA MODIFICAÇÃO (Histórico de Logs) ---
+populate_lock = threading.Lock()
+# Set para rastrear quais (symbol, timeframe) já tiveram o histórico carregado nesta sessão
+populated_caches = set()
+
 LOG_HISTORY_LIMIT = 500
 log_history = deque(maxlen=LOG_HISTORY_LIMIT)  # Armazena os últimos N logs
-# --- FIM DA MODIFICAÇÃO ---
 
 logging.SUCCESS = 25
 logging.addLevelName(logging.SUCCESS, 'SUCCESS')
+logging.EXECUTE = 26
+logging.addLevelName(logging.EXECUTE, 'EXECUTE')
 
 
 class JSONFormatter(logging.Formatter):
@@ -91,11 +97,75 @@ def setup_logging():
     logging.getLogger('socketio').setLevel(logging.WARNING)
     logging.getLogger('engineio').setLevel(logging.WARNING)
 
+    def execute(self, message, *args, **kws):
+        if self.isEnabledFor(logging.EXECUTE):
+            self._log(logging.EXECUTE, message, args, **kws)
+
+    logging.Logger.execute = execute
+
 
 log = logging.getLogger('Sistema')
 
 
-# --- INÍCIO DA MODIFICAÇÃO (Envia logs iniciais ao conectar) ---
+# MODIFICAÇÃO: Garantir que o BTC/1h seja carregado se o filtro estiver em uso
+def get_active_symbol_timeframes(config: dict) -> dict[tuple[str, str], int]:
+    """
+    Extrai todos os pares (symbol, timeframe) únicos e o mínimo
+    de candles necessários para cada um, dos setups ativos.
+
+    Retorna:
+        dict: {(ws_symbol, timeframe): min_candles, ...}
+    """
+    active_pairs_map = {}
+    btc_trend_in_use = False  # <<< ADICIONADO
+
+    exchanges_config = config.get('exchanges', {})
+    for ex_data in exchanges_config.values():
+        for account in ex_data.get('accounts', []):
+            for setup in account.get('markets_to_trade', []):
+                symbol = setup.get('base_currency')
+                strategy_name = setup.get('strategy_name')
+
+                # <<< ADICIONADO: Verifica se o filtro BTC está em uso
+                if setup.get('direction_mode') == 'btc_trend':
+                    btc_trend_in_use = True
+
+                if symbol and strategy_name and strategy_name in STRATEGIES:
+                    strategy_config = STRATEGIES[strategy_name]
+                    timeframe = strategy_config.get('timeframe')
+                    min_candles_strategy = strategy_config.get('min_candles', 200)
+
+                    if timeframe and timeframe in WebSocketManager.SUPPORTED_TIMEFRAMES:
+                        ccxt_symbol = f"{symbol.upper()}/USDT"
+                        ws_symbol = ccxt_symbol.replace('/', '-')
+
+                        cache_key = (ws_symbol, timeframe)
+
+                        current_min = active_pairs_map.get(cache_key, 0)
+                        active_pairs_map[cache_key] = max(current_min, min_candles_strategy)
+
+                    elif timeframe:
+                        log.warning(
+                            f"Timeframe '{timeframe}' da estratégia '{strategy_name}' não é suportado pelo WebSocketManager.")
+                elif not symbol:
+                    log.warning(f"Setup na conta {account.get('account_name')} sem 'base_currency'.")
+                elif not strategy_name:
+                    log.warning(f"Setup para {symbol} na conta {account.get('account_name')} sem 'strategy_name'.")
+                elif strategy_name not in STRATEGIES:
+                    log.warning(f"Estratégia '{strategy_name}' não encontrada no arquivo strategies.py.")
+
+    # <<< ADICIONADO: Força a inclusão do BTC/1h se o filtro estiver em uso
+    if btc_trend_in_use:
+        log.info("Filtro de tendência BTC em uso. Adicionando 'BTC-USDT'/'1h' ao WS Manager.")
+        btc_key = ('BTC-USDT', '1h')
+        current_min_btc = active_pairs_map.get(btc_key, 0)
+        # O filtro de tendência (get_btc_trend_filter) precisa de pelo menos 50 velas de 1h
+        active_pairs_map[btc_key] = max(current_min_btc, 100)  # 100 por segurança
+
+    log.info(f"Pares/Timeframes ativos identificados para WebSocket: {active_pairs_map or 'Nenhum'}")
+    return active_pairs_map
+
+
 @socketio.on('connect')
 def handle_connect():
     """Envia o histórico de logs para o cliente que acabou de conectar."""
@@ -114,6 +184,9 @@ def handle_disconnect():
 # Variáveis globais (sem bot_logs)
 account_info_cache = {}
 dashboard_metrics_cache = {}
+dashboard_metrics_timestamp = {}  # Timestamp do último cálculo das métricas históricas
+trade_history_30d_cache = {}  # <<< NOVO: Cache de trades dos últimos 30 dias (bruto)
+trade_history_30d_timestamp = {}  # <<< NOVO: Timestamp do cache de trades
 open_positions_cache = {}
 weekly_volume_cache = {}
 last_refresh_error = {}
@@ -209,18 +282,20 @@ def hourly_alert_task():
 
 
 def full_daily_sync_task():
-    """Tarefa diária que faz uma sincronização completa (trades e ordens) para TODAS as contas."""
     log.info(f"AGENDADOR DIÁRIO: Iniciando tarefa de sincronização COMPLETA")
     config = load_config()
-    daily_start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
+    daily_start_time_ms = int((datetime.now() - timedelta(days=7)).timestamp() * 1000)
     for exchange_name, exchange_data in config.get('exchanges', {}).items():
         for account_config in exchange_data.get('accounts', []):
             account_logger = logging.getLogger(account_config['account_name'])
             try:
                 account_logger.info(f"Sincronização diária completa INICIADA.")
                 client = get_client(exchange_name, account_config)
-                sync_order_history(client, exchange_name, account_config['account_name'])
+                # sync_order_history(client, exchange_name, account_config['account_name'])
                 sync_trade_history(client, exchange_name, account_config['account_name'], daily_start_time_ms)
+                # Força o recálculo do dashboard após a sync completa
+                global dashboard_metrics_timestamp
+                dashboard_metrics_timestamp[account_config['account_name']] = 0
             except Exception as e:
                 account_logger.error(f"ERRO durante a sincronização diária: {e}")
     log.info("AGENDADOR DIÁRIO: Tarefa de sincronização completa concluída.")
@@ -382,8 +457,8 @@ def _adapt_pnl_history_for_dashboard(pnl_history: list) -> list:
 
 
 def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
-    """Função genérica para buscar dados da API usando a factory."""
-    global account_info_cache, dashboard_metrics_cache, open_positions_cache, last_refresh_error, weekly_volume_cache
+    """Função genérica para buscar dados da API usando a factory. Otimizada para evitar buscas históricas pesadas."""
+    global account_info_cache, dashboard_metrics_cache, open_positions_cache, last_refresh_error, weekly_volume_cache, dashboard_metrics_timestamp, trade_history_30d_cache, trade_history_30d_timestamp
     account_name = account_config['account_name']
     account_logger = logging.getLogger(account_name)
     account_logger.debug("Iniciando busca de dados da API...")
@@ -399,28 +474,94 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
         account_info_cache[account_name] = account_info
         account_logger.debug("Informações da conta obtidas.")
 
-        start_time_7d = int((datetime.now() - timedelta(days=7)).timestamp() * 1000)
-        end_time_7d = int(time.time() * 1000)
-        trade_history_7d = client.get_trade_history(start_time_7d, end_time_7d)
+        current_time_s = int(time.time())
+        CACHE_FRESHNESS_S = 3600  # 1 hora
+
+        # --- CÁLCULO DE TEMPOS (30d) ---
+        start_dt_30d = datetime.now() - timedelta(days=30)
+        # Define o início do dia (00:00:00) 30 dias atrás para garantir o período completo
+        start_of_day_30d = start_dt_30d.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_time_30d_ms = int(start_of_day_30d.timestamp() * 1000)
+        end_time_30d_ms = int(time.time() * 1000)  # Usado para o final do período (agora)
+        # --- FIM DO CÁLCULO DE TEMPOS ---
+
+        # 0. Cache de Histórico de Trades (30 dias) - OTIMIZAÇÃO DE BUSCA PARA VOLUMES
+        is_history_cache_fresh = current_time_s - trade_history_30d_timestamp.get(account_name, 0) <= CACHE_FRESHNESS_S
+
+        if not is_history_cache_fresh and exchange_name != 'apex':  # Apex não usa esse cache de trades
+            account_logger.info("Cache de trades (30d) expirado/ausente. Buscando via API...")
+            try:
+                # Busca o histórico dos últimos 30 dias (início do dia 30 dias atrás)
+                trades_30d = client.get_trade_history(start_time_30d_ms, end_time_30d_ms)
+                trade_history_30d_cache[account_name] = trades_30d
+                trade_history_30d_timestamp[account_name] = current_time_s
+                account_logger.debug(f"Cache de trades (30d) populado com {len(trades_30d)} trades.")
+            except Exception as e:
+                account_logger.error(f"Erro ao buscar histórico de trades (30d): {e}")
+                trade_history_30d_cache[account_name] = []
+        elif exchange_name == 'apex':
+            # Garante que o cache para Apex esteja vazio
+            trade_history_30d_cache[account_name] = []
+
+        # 1. Volume Semanal (Busca Leve) - USA O CACHE DE 30 DIAS OU FALLBACK
+        start_time_7d_ms = int((datetime.now() - timedelta(days=7)).timestamp() * 1000)
+        trades_for_7d_volume = []
+
+        if trade_history_30d_cache.get(account_name):
+            account_logger.debug("Calculando volume (7d) a partir do cache (30d).")
+            # Filtra o cache de 30 dias pelo timestamp de 7 dias
+            trades_for_7d_volume = [
+                t for t in trade_history_30d_cache[account_name]
+                if t.get('created_at') and t['created_at'] >= start_time_7d_ms
+            ]
+        elif exchange_name != 'apex':
+            # Fallback: Se o cache falhou na Pacífica, faz a chamada de 7 dias
+            account_logger.warning("Cache de trades indisponível. Buscando trades (7d) via API (fallback).")
+            trades_for_7d_volume = client.get_trade_history(start_time_7d_ms, end_time_30d_ms)
+        else:
+            # Apex: Não usa cache de trades, faz a chamada de 7 dias
+            trades_for_7d_volume = client.get_trade_history(start_time_7d_ms, end_time_30d_ms)
+
         total_volume = 0
-        if trade_history_7d:
-            for trade in trade_history_7d:
+        if trades_for_7d_volume:
+            for trade in trades_for_7d_volume:
                 amount = float(trade.get('amount', 0.0))
                 trade_price = float(trade.get('price', 0.0))
                 total_volume += amount * trade_price
         weekly_volume_cache[account_name] = total_volume
         account_logger.debug(f"Volume semanal calculado: {total_volume}")
 
-        end_time_30d = int(time.time() * 1000)
-        start_time_30d = int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
-        if exchange_name == 'apex':
-            pnl_history = client.get_pnl_history(start_time_30d, end_time_30d)
-            trades_for_metrics = _adapt_pnl_history_for_dashboard(pnl_history)
-        else:
-            trades_for_metrics = client.get_trade_history(start_time_30d, end_time_30d)
-        dashboard_metrics_cache[account_name] = calculate_dashboard_metrics(trades_for_metrics)
-        account_logger.debug("Métricas do dashboard calculadas.")
+        # 2. Métricas do Dashboard (30 dias) - Busca Pesada, OTIMIZADA POR TEMPO DE CACHE
+        is_metrics_cache_fresh = current_time_s - dashboard_metrics_timestamp.get(account_name, 0) <= CACHE_FRESHNESS_S
 
+        if not is_metrics_cache_fresh:
+            account_logger.info("Métricas do dashboard (30d) expiradas ou ausentes. Recalculando...")
+
+            # --- CÓDIGO DA BUSCA PESADA ---
+            if exchange_name == 'apex':
+                # Apex usa endpoint de PNL (get_pnl_history)
+                # AQUI FOI CORRIGIDO PARA USAR start_time_30d_ms
+                pnl_history = client.get_pnl_history(start_time_30d_ms, end_time_30d_ms)
+                trades_for_metrics = _adapt_pnl_history_for_dashboard(pnl_history)
+            else:
+                # Pacífica/Outras usam o histórico de trades de 30 dias que foi cacheado acima
+                if trade_history_30d_cache.get(account_name):
+                    trades_for_metrics = trade_history_30d_cache[account_name]
+                else:
+                    # Se o cache falhou para trades (30d), faz a chamada de 30 dias novamente (último recurso)
+                    account_logger.warning("Cache de trades (30d) indisponível para métricas. Buscando via API.")
+                    # AQUI FOI CORRIGIDO PARA USAR start_time_30d_ms
+                    trades_for_metrics = client.get_trade_history(start_time_30d_ms, end_time_30d_ms)
+
+            dashboard_metrics_cache[account_name] = calculate_dashboard_metrics(trades_for_metrics)
+            dashboard_metrics_timestamp[account_name] = current_time_s  # Atualiza timestamp
+            account_logger.debug("Métricas do dashboard calculadas e cacheadas.")
+        else:
+            account_logger.debug(f"Métricas do dashboard (30d) frescas. Pulando cálculo.")
+            if account_name not in dashboard_metrics_cache:
+                dashboard_metrics_cache[account_name] = calculate_dashboard_metrics([])
+
+        # 3. Posições Abertas (Busca Leve)
         open_positions_list = client.get_open_positions()
         open_positions_details = []
         if open_positions_list:
@@ -474,12 +615,11 @@ def fetch_and_cache_api_data(account_config: dict, exchange_name: str):
     except Exception as e:
         error_msg = f"Erro ao buscar dados da API: {e}"
         account_logger.error(error_msg, exc_info=True)
-        last_refresh_error[account_name] = error_msg
-        # Limpa cache para essa conta em caso de erro
+        # Limpa cache de dados leves para essa conta em caso de erro
         account_info_cache[account_name] = None
-        dashboard_metrics_cache[account_name] = None
         open_positions_cache[account_name] = []
         weekly_volume_cache[account_name] = 0
+        last_refresh_error[account_name] = error_msg
 
 
 @app.route('/')
@@ -567,6 +707,10 @@ def index():
         if positions:
             open_positions_by_account[acc_name] = {pos['symbol'].upper() for pos in positions}
 
+    # ADICIONADO: Parâmetros TSL lidos do config.json
+    profit_lock_params = config.get('profit_lock_params', [])
+    ema_trail_delay_params = config.get('ema_trail_delay_params', [])
+
     return render_template(
         'index.html',
         accounts=all_accounts,
@@ -585,21 +729,23 @@ def index():
         last_backtest_symbol=last_backtest_symbol,
         version_info=version_info,
         telegram_config=telegram_config,
-        strategy_names=strategy_names
+        strategy_names=strategy_names,
+        profit_lock_params=profit_lock_params,  # ADDED
+        ema_trail_delay_params=ema_trail_delay_params  # ADDED
     )
 
 
 @app.route('/refresh_all', methods=['POST'])
 def refresh_all():
-    """Limpa todos os caches de dados para forçar uma atualização completa."""
-    global account_info_cache, dashboard_metrics_cache, open_positions_cache, weekly_volume_cache, last_refresh_error
-    log.info("Forçando a atualização de todos os dados das contas...")
+    """Limpa apenas os caches de dados em tempo real para forçar uma atualização leve."""
+    global account_info_cache, open_positions_cache, weekly_volume_cache, last_refresh_error
+    log.info("Forçando a atualização LEVE de todos os dados das contas (exceto métricas históricas)...")
     account_info_cache.clear()
-    dashboard_metrics_cache.clear()
     open_positions_cache.clear()
     weekly_volume_cache.clear()
     last_refresh_error.clear()
-    # Não precisa mais logar aqui, a função fetch_and_cache fará isso
+    # dashboard_metrics_cache e dashboard_metrics_timestamp NÃO são limpos, mantendo o histórico pesado cacheado.
+    # trade_history_30d_cache e trade_history_30d_timestamp TAMBÉM NÃO SÃO LIMPOS
     return redirect(url_for('index'))
 
 
@@ -621,67 +767,140 @@ def stop_all():
     return redirect(url_for('index'))
 
 
+# MODIFICAÇÃO 2: Simplifica drasticamente o start_bot_logic
 def start_bot_logic(account_name, exchange_name):
-    """Inicia a thread do bot para uma conta específica."""
-    global running_bots
+    """Inicia a thread do bot, popula o cache SOB DEMANDA (se novo) e subscreve aos klines."""
+    global running_bots, populated_caches, populate_lock  # Removido populate_cache_thread
     account_logger = logging.getLogger(account_name)
+
     if account_name in running_bots:
         account_logger.warning("Bot já está em execução.")
         return
 
     config = load_config()
-    account_config = next(
-        (acc for ex_data in config.get('exchanges', {}).values()
-         for acc in ex_data.get('accounts', []) if acc['account_name'] == account_name), None)
-
-    if not account_config:
-        log.error(f"Configuração não encontrada para a conta '{account_name}' na exchange '{exchange_name}'.")
-        return
-
-    # A exchange_name passada como argumento pode estar errada se a conta foi movida. Pegar da config.
+    account_config = None
     found_exchange = None
+    # ... (lógica para encontrar account_config mantida) ...
     for ex_n, ex_d in config.get('exchanges', {}).items():
-        if any(acc['account_name'] == account_name for acc in ex_d.get('accounts', [])):
-            found_exchange = ex_n
-            break
-    if not found_exchange:
-        log.error(f"Não foi possível determinar a exchange correta para a conta '{account_name}'.")
-        return
-    exchange_name = found_exchange  # Usa a exchange correta encontrada
+        for acc in ex_d.get('accounts', []):
+            if acc['account_name'] == account_name:
+                account_config = acc
+                found_exchange = ex_n
+                break
+        if account_config: break
 
+    if not account_config or not found_exchange:
+        log.error(f"Configuração não encontrada para a conta '{account_name}'. Bot não iniciado.")
+        return
+    exchange_name = found_exchange
+
+    # --- Lógica de Inicialização Sob Demanda do WS Manager ---
+    # REMOVIDO: Bloco 'first_bot_starting' (WS já está rodando)
+
+    # Identifica os pares/timeframes necessários para ESTE bot
+    pairs_needed_by_bot = set()
+    min_candles_map = {}
+    for setup in account_config.get('markets_to_trade', []):
+        symbol = setup.get('base_currency')
+        strategy_name = setup.get('strategy_name')
+        if symbol and strategy_name and strategy_name in STRATEGIES:
+            timeframe = STRATEGIES[strategy_name].get('timeframe')
+            min_candles = STRATEGIES[strategy_name].get('min_candles', 200)
+            if timeframe:
+                ws_symbol = f"{symbol.upper()}-USDT"
+                cache_key = (ws_symbol, timeframe)
+                pairs_needed_by_bot.add(cache_key)
+                min_candles_map[cache_key] = max(min_candles_map.get(cache_key, 0), min_candles)
+
+    # Popula o cache SÍNCRONAMENTE (Mantido para setups adicionados APÓS startup)
+    population_successful = True
+    for symbol, timeframe in pairs_needed_by_bot:
+        cache_key = (symbol, timeframe)
+        if cache_key not in populated_caches:
+            with populate_lock:
+                if cache_key not in populated_caches:
+                    log.info(f"Cache para {cache_key} não populado (novo setup?). Iniciando busca síncrona...")
+                    min_candles_needed = min_candles_map[cache_key]
+                    try:
+                        # Chama a função síncrona diretamente
+                        ws_manager.populate_initial_cache(symbol, timeframe, min_candles_needed)
+                        with ws_manager._lock:
+                            if cache_key in ws_manager._cache and len(
+                                    ws_manager._cache[cache_key]) >= min_candles_needed:
+                                log.info(f"Cache para {cache_key} populado com sucesso (on-demand).")
+                                populated_caches.add(cache_key)
+                            else:
+                                log.error(f"Falha ao popular cache (on-demand) para {cache_key}.")
+                                population_successful = False
+                    except Exception as pop_err:
+                        log.error(f"Erro CRÍTICO ao popular cache (on-demand) para {cache_key}: {pop_err}",
+                                  exc_info=True)
+                        population_successful = False
+        # else: log.debug(f"Cache {cache_key} já populado (ignorado on-demand).")
+
+    # Sincronização de histórico REST (mantida)
     try:
-        account_logger.info("Sincronizando histórico antes de iniciar o bot...")
+        account_logger.info("Sincronizando histórico REST (trades)...")
         client = get_client(exchange_name, account_config)
+        # Define um start_time razoável, pode ser ajustado
         start_time_ms = int((datetime.now() - timedelta(days=90)).timestamp() * 1000)
         sync_trade_history(client, exchange_name, account_name, start_time_ms)
-        account_logger.info("Sincronização concluída.")
+        account_logger.info("Sincronização REST (trades) concluída.")
     except Exception as e:
-        error_msg = f"ERRO ao sincronizar o histórico ao iniciar: {e}"
-        account_logger.error(error_msg, exc_info=True)
-        # Decide se quer continuar mesmo com erro de sync. Por ora, continuamos.
+        account_logger.error(f"ERRO ao sincronizar histórico REST ao iniciar: {e}", exc_info=True)
+        # Decide se continua mesmo com erro de sync. Por ora, continuamos.
 
+    # Inicia a instância e thread do Bot
     try:
-        bot_instance_local = TradingBot(account_config, config, exchange_name)
+        bot_instance_local = TradingBot(account_config, config, exchange_name, ws_manager)
         bot_thread_local = threading.Thread(target=bot_instance_local.run, name=f"BotThread-{account_name}",
                                             daemon=True)
         bot_thread_local.start()
         running_bots[account_name] = {"instance": bot_instance_local, "thread": bot_thread_local}
-        # O log de "iniciado" agora está dentro do bot_logic.py
+
+        # Subscreve aos pares deste bot no WS Manager
+        # (Isto agora irá acionar o ws_manager para iniciar o stream se não estiver ativo)
+        for symbol, timeframe in pairs_needed_by_bot:
+            ws_manager.subscribe(symbol, timeframe)
+
     except Exception as e:
-        account_logger.critical(f"Falha CRÍTICA ao iniciar a thread do bot: {e}", exc_info=True)
+        account_logger.critical(f"Falha CRÍTICA ao iniciar thread do bot {account_name}: {e}", exc_info=True)
+        # Tenta limpar se a entrada foi adicionada a running_bots
+        if account_name in running_bots:
+            del running_bots[account_name]
+        # Considerar cancelar subscrições feitas no loop acima se falhar aqui?
+        for symbol, timeframe in pairs_needed_by_bot:
+            ws_manager.unsubscribe(symbol, timeframe)  # Decrementa contador
 
 
+# MODIFICAÇÃO 3: Simplifica drasticamente o stop_bot_logic
 def stop_bot_logic(account_name):
-    global running_bots
+    global running_bots, populated_caches  # populated_caches mantido
     account_logger = logging.getLogger(account_name)
     if account_name in running_bots:
-        bot_to_stop = running_bots.pop(account_name)  # Remove da lista imediatamente
-        if bot_to_stop and bot_to_stop["instance"]:
+        bot_to_stop_data = running_bots.pop(account_name)  # Remove da lista primeiro
+        if bot_to_stop_data and bot_to_stop_data["instance"]:
             account_logger.warning(f"Parando bot...")
-            bot_to_stop["instance"].stop()
-            # Espera um pouco a thread terminar (opcional)
-            # bot_to_stop["thread"].join(timeout=5)
-            # O log de "parado" agora está dentro do bot_logic.py
+            instance = bot_to_stop_data["instance"]
+            thread = bot_to_stop_data["thread"]
+
+            # Cancela subscrições WS deste bot
+            account_config = instance.account_config
+            for setup in account_config.get('markets_to_trade', []):
+                symbol = setup.get('base_currency')
+                strategy_name = setup.get('strategy_name')
+                if symbol and strategy_name and strategy_name in STRATEGIES:
+                    timeframe = STRATEGIES[strategy_name].get('timeframe')
+                    if timeframe:
+                        ws_symbol = f"{symbol.upper()}-USDT"
+                        ws_manager.unsubscribe(ws_symbol, timeframe)
+
+            # Para a instância/thread do bot
+            instance.stop()
+            if thread and thread.is_alive():
+                thread.join(timeout=5)  # Espera um pouco
+
+
         else:
             account_logger.error("Registro do bot encontrado, mas instância inválida.")
     else:
@@ -824,15 +1043,67 @@ def process_setup_form():
             tsl_type = request.form.get('tsl_type')
             if tsl_type and tsl_type != 'none':
                 tsl_config = {"type": tsl_type}
-                if tsl_type == 'breakeven':
+
+                # --- LÓGICA DE TRATAMENTO DO NOVO VALOR TSL ---
+                tsl_value_input = request.form.get('tsl_value')
+                tsl_value_converted = None
+
+                # Variáveis para os novos dicionários - usando .get(..., '') para strings vazias
+                tsl_profit_lock_index_str = request.form.get('tsl_profit_lock_index', '').strip()
+                tsl_ema_delay_index_str = request.form.get('tsl_ema_delay_index', '').strip()
+
+                # Tipos que usam valor direto (float)
+                if tsl_type in ['atr', 'fixed_pct', 'high_low_trail', 'ema_trail', 'atr_dynamic',
+                                'candle_range_confirm']:
+                    if not tsl_value_input:
+                        raise ValueError(f"O valor de Trailing Stop para o modo '{tsl_type.upper()}' é obrigatório.")
+
+                    tsl_value = float(tsl_value_input)
+                    if tsl_type in ['atr', 'atr_dynamic']:  # ATR Multiplier is used directly
+                        if not (0.1 <= tsl_value <= 10): raise ValueError("Múltiplo ATR inválido (0.1 a 10).")
+                        tsl_value_converted = tsl_value
+                    elif tsl_type in ['fixed_pct', 'high_low_trail', 'ema_trail', 'candle_range_confirm']:
+                        # PCT Value needs conversion
+                        if not (0.01 <= tsl_value <= 10): raise ValueError(
+                            "Valor Percentual TSL inválido (0.01% a 10%).")
+                        tsl_value_converted = tsl_value / 100.0
+
+                    tsl_config['tsl_value'] = tsl_value_converted
+
+                    # Lógica para Dicionários (profit_lock)
+                elif tsl_type == 'profit_lock':
+                    profit_lock_params = config.get('profit_lock_params', [])
+                    if tsl_profit_lock_index_str.isdigit():
+                        index = int(tsl_profit_lock_index_str)
+                        if 0 <= index < len(profit_lock_params):
+                            tsl_config['tsl_value'] = profit_lock_params[index]
+                        else:
+                            raise ValueError("Índice de Parâmetro Profit Lock inválido.")
+                    else:
+                        raise ValueError("Parâmetro Profit Lock não selecionado.")
+
+                        # Lógica para Dicionários (ema_trail_delay)
+                elif tsl_type == 'ema_trail_delay':
+                    ema_trail_delay_params = config.get('ema_trail_delay_params', [])
+                    if tsl_ema_delay_index_str.isdigit():
+                        index = int(tsl_ema_delay_index_str)
+                        if index < len(ema_trail_delay_params):
+                            tsl_config['tsl_value'] = ema_trail_delay_params[index]
+                        else:
+                            raise ValueError("Índice de Parâmetro EMA Trail Delay inválido.")
+                    else:
+                        raise ValueError("Parâmetro EMA Trail Delay não selecionado.")
+
+                elif tsl_type == 'breakeven':
                     breakeven_trigger = float(request.form.get('tsl_breakeven_trigger', 1.0))
                     if not (0.1 <= breakeven_trigger <= 10): raise ValueError(
                         "Gatilho Breakeven RRR inválido (0.1 a 10).")
                     tsl_config['breakeven_trigger_rrr'] = breakeven_trigger
-                # Adicionar validação para ATR se implementado
+
                 tsl_config['remove_tp_on_trail'] = request.form.get(
                     'remove_tp_on_trail') == 'true'  # Converte para bool
                 new_market_setup['trailing_stop_config'] = tsl_config
+            # ... (rest of the function)
 
             account_found = False
             for ex_data in config.get('exchanges', {}).values():
@@ -922,6 +1193,7 @@ def process_setup_form():
         return redirect(url_for('index',
                                 last_backtest_symbol=symbol if 'symbol' in locals() else base_currency_form))  # Garante que o símbolo vá para a URL
 
+
 @app.route('/api/pnl_chart_data')
 def get_pnl_chart_data():
     # --- INÍCIO DA MODIFICAÇÃO (Buscar 30 dias) ---
@@ -935,7 +1207,7 @@ def get_pnl_chart_data():
 
     try:
         # Chama a função do database.py que retorna todos os dados necessários dos últimos 30 dias
-        all_pnl_data = query_daily_pnl_all_accounts(start_time_30d_ms) # Passa o timestamp de 30 dias
+        all_pnl_data = query_daily_pnl_all_accounts(start_time_30d_ms)  # Passa o timestamp de 30 dias
 
         if not all_pnl_data:
             log.warning("Nenhum dado PNL encontrado pela query unificada nos últimos 30 dias.")
@@ -989,15 +1261,101 @@ def get_pnl_chart_data():
         log.error(f"Erro ao processar dados PNL da query unificada: {e}", exc_info=True)
         return jsonify({"error": "Erro interno ao processar dados do gráfico."}), 500
 
+
+def _background_populate_caches(pairs_to_populate_dict: dict):
+    """Função para ser executada em uma thread separada para popular caches."""
+    log.info("Thread de população de cache iniciada.")
+
+    # Separa o par BTC/1h dos outros
+    btc_key = ('BTC-USDT', '1h')
+    btc_min_candles = pairs_to_populate_dict.pop(btc_key, None)
+    other_pairs_to_populate = pairs_to_populate_dict
+
+    # Popula BTC/1h primeiro (se necessário)
+    if btc_min_candles is not None:
+        log.info(f"Populando cache prioritário {btc_key} em background...")
+        try:
+            ws_manager.populate_initial_cache(btc_key[0], btc_key[1], btc_min_candles)
+            with ws_manager._lock:
+                if btc_key in ws_manager._cache and len(ws_manager._cache[btc_key]) >= btc_min_candles:
+                    with populate_lock:
+                        populated_caches.add(btc_key)
+                    log.info(f"Cache {btc_key} populado com sucesso (background).")
+                else:
+                    log.error(f"Cache {btc_key} (background) não atingiu o mínimo de candles.")
+        except Exception as e:
+            log.critical(f"Falha grave durante a população (background) do cache {btc_key}: {e}", exc_info=True)
+
+    # Popula os demais pares
+    log.info(f"Populando cache dos demais {len(other_pairs_to_populate)} pares em background...")
+    try:
+        populated_keys_others = ws_manager.populate_all_initial_caches(other_pairs_to_populate)
+        with populate_lock:
+            populated_caches.update(populated_keys_others)
+        log.info(
+            f"População de cache (demais pares, background) concluída. {len(populated_keys_others)}/{len(other_pairs_to_populate)} bem-sucedidos.")
+    except Exception as e:
+        log.critical(f"Falha grave durante a população do cache (demais pares, background): {e}", exc_info=True)
+
+    log.info("Thread de população de cache finalizada.")
+
+
+# MODIFICAÇÃO 4: Lógica de inicialização principal
 if __name__ == '__main__':
-    setup_logging()  # Configura o logging antes de tudo
+    setup_logging()
     try:
         init_db()
         log.info("=============================================")
-        log.info("Iniciando KBot-Trading...")
+        log.info("Iniciando KBot-Trading WebApp...")
+
+        # --- LÓGICA DE STARTUP MODIFICADA ---
+        log.info("Carregando configuração...")
+        config = load_config()
+
+        log.info("Identificando pares/timeframes ativos...")
+        pairs_to_populate = get_active_symbol_timeframes(config)  # Mantém a lógica que pode adicionar BTC/1h
+
+        if pairs_to_populate:
+            log.info(f"Definindo subscrições iniciais ({len(pairs_to_populate)}) no WS Manager...")
+            ws_manager.set_initial_subscriptions(set(pairs_to_populate.keys()))
+
+            log.info("Iniciando WebSocket Manager (thread asyncio)...")
+            ws_manager.start()
+            # NÃO esperamos mais o WS Manager estar pronto aqui
+
+            # *** INICIA A POPULAÇÃO DO CACHE EM BACKGROUND ***
+            log.info("Iniciando população de cache em background...")
+            cache_thread = threading.Thread(
+                target=_background_populate_caches,
+                args=(pairs_to_populate.copy(),),  # Passa uma cópia do dicionário
+                daemon=True,
+                name="CachePopulationThread"
+            )
+            cache_thread.start()
+            # *** NÃO ESPERAMOS A THREAD TERMINAR ***
+
+        else:
+            log.warning("Nenhum setup ativo encontrado. WS Manager iniciado, mas inativo (sem caches).")
+            # Inicia o WS Manager mesmo sem pares, caso sejam adicionados depois
+            ws_manager.start()
+
+            # *** INICIA O SERVIDOR WEB IMEDIATAMENTE ***
         log.info("=============================================")
-        # Usa o run do socketio
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+        log.info("Iniciando servidor web Flask (SocketIO)... Acesso liberado!")
+        # A população do cache continua em background
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True, use_reloader=False)
+
+    except KeyboardInterrupt:
+        log.warning("Ctrl+C recebido. Encerrando...")
     except Exception as e:
-        log.critical(f"Falha ao iniciar a aplicação: {e}", exc_info=True)
-        sys.exit(1)  # Sai se não conseguir iniciar
+        log.critical(f"Falha CRÍTICA: {e}", exc_info=True)
+    finally:
+        log.warning("Encerrando aplicação...")
+        # (Lógica de shutdown mantida)
+        if ws_manager.is_running():
+            log.warning("Encerrando WebSocket Manager...")
+            ws_manager.stop()
+        log.warning("Encerrando Agendador...")
+        if scheduler.running:
+            scheduler.shutdown()
+        log.info("Aplicação KBot-Trading encerrada.")

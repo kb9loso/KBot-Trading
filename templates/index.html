@@ -85,6 +85,8 @@
         .log-line[data-level="WARNING"] .log-icon { color: #facc15; } /* Amarelo claro */
         .log-line[data-level="ERROR"] .log-icon { color: #f87171; } /* Vermelho claro */
         .log-line[data-level="DEBUG"] .log-icon { color: #c084fc; } /* Roxo claro */
+        /* NOVO NÍVEL */
+        .log-line[data-level="EXECUTE"] .log-icon { color: #22d3ee; } /* Ciano claro (cyan-400) */
 
         .log-timestamp {
             flex-shrink: 0;
@@ -149,6 +151,13 @@
             padding: 0.2rem 0.5rem;
             border-radius: 0.375rem; /* rounded-md */
             border: 1px solid;
+            cursor: pointer; /* Adicionado para os botões de filtro */
+            transition: background-color 0.15s;
+        }
+
+        /* Estilo base para botões de filtro de log */
+        .log-level-filter-btn:hover {
+            opacity: 0.8;
         }
         /* Cores ajustadas (Fundo sólido escuro, Texto claro, Borda sutil) */
         .stat-badge-all { background-color: #334155; color: #cbd5e1; border-color: #475569; }
@@ -156,6 +165,23 @@
         .stat-badge-success { background-color: #166534; color: #86efac; border-color: #22c55e; } /* Fundo: green-800, Texto: green-300, Borda: green-500 */
         .stat-badge-warning { background-color: #854d0e; color: #fde047; border-color: #eab308; } /* Fundo: amber-800, Texto: yellow-300, Borda: yellow-500 */
         .stat-badge-error { background-color: #991b1b; color: #fca5a5; border-color: #ef4444; } /* Fundo: red-800, Texto: red-300, Borda: red-500 */
+        /* NOVO NÍVEL EXECUTE */
+        .stat-badge-execute { background-color: #0d9488; color: #5eead4; border-color: #2dd4bf; } /* Fundo: teal-800, Texto: teal-300, Borda: teal-500 */
+
+        /* Estilo para botão de filtro ativo */
+        .log-level-filter-btn.active {
+            font-weight: 700; /* Bold */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); /* Exemplo: um ring azul sutil */
+            opacity: 1;
+        }
+
+        /* Cores ativas específicas */
+        .log-level-filter-btn[data-level="ALL"].active { background-color: #475569; border-color: #cbd5e1; }
+        .log-level-filter-btn[data-level="INFO"].active { background-color: #3b82f6; color: #fff; border-color: #3b82f6; }
+        .log-level-filter-btn[data-level="SUCCESS"].active { background-color: #22c55e; color: #fff; border-color: #22c55e; }
+        .log-level-filter-btn[data-level="WARNING"].active { background-color: #eab308; color: #1e293b; border-color: #eab308; }
+        .log-level-filter-btn[data-level="ERROR"].active { background-color: #ef4444; color: #fff; border-color: #ef4444; }
+        .log-level-filter-btn[data-level="EXECUTE"].active { background-color: #2dd4bf; color: #1e293b; border-color: #2dd4bf; }
 
 
         /* Controles (Botões) */
@@ -217,6 +243,28 @@
         }
         /* --- FIM DA MODIFICAÇÃO (CSS v3) --- */
 
+        /* INÍCIO MODIFICAÇÃO PARA ORDENAÇÃO DE TABELA */
+        .sort-icon {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-left: 5px;
+            vertical-align: middle;
+            transition: opacity 0.2s;
+        }
+        .sort-asc {
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 4px solid #cbd5e1; /* text-slate-300 */
+            opacity: 1 !important;
+        }
+        .sort-desc {
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid #cbd5e1; /* text-slate-300 */
+            opacity: 1 !important;
+        }
+        /* FIM MODIFICAÇÃO PARA ORDENAÇÃO DE TABELA */
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100 p-6">
@@ -285,7 +333,7 @@
                     <thead>
                         <tr class="text-left text-sm text-gray-400 border-b border-slate-700">
                             <th class="pb-3 px-3">Nome da Conta</th><th class="pb-3 px-3">Exchange</th><th class="pb-3 px-3">Chave Pública</th>
-                            <th class="pb-3 px-3">Intervalo</th><th class="pb-3 px-3">Status</th><th class="pb-3 px-3 text-right">Ação</th>
+                            <th class="pb-3 px-3">Status</th><th class="pb-3 px-3 text-right">Ação</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -305,7 +353,6 @@
                                     N/A
                                 {% endif %}
                             </td>
-                            <td class="py-3 px-3 text-sm">{{ account.check_interval_seconds }}s</td>
                             <td class="py-3 px-3">
                                 <span class="text-sm font-semibold px-3 py-1 rounded-full {{ 'text-green-400 bg-green-500/20' if account.account_name in running_bots else 'text-gray-400 bg-gray-500/20' }}">
                                     {{ 'Executando' if account.account_name in running_bots else 'Pausado' }}
@@ -356,10 +403,6 @@
                             <option value="{{ ex_name }}">{{ ex_name | capitalize }}</option>
                             {% endfor %}
                         </select>
-                    </label>
-                    <label title="O intervalo em segundos que o bot aguardará entre cada verificação de sinais de trading." class="block">
-                        <span class="block text-sm font-medium text-gray-300 mb-2">Intervalo (s)</span>
-                        <input type="number" name="check_interval" value="180" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                     </label>
                 </div>
                 <div id="pacifica-fields" class="credential-fields space-y-4">
@@ -488,7 +531,7 @@
             </div>
 
             <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
-                <h2 class="text-xl font-bold flex items-center gap-2 mb-6">
+                <h2 class="text-xl font-bold flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-5 h-5 text-green-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                     Performance (Últimos 30 Dias)
                 </h2>
@@ -581,15 +624,16 @@
                             <table class="w-full">
                                 <thead>
                                    <tr class="text-left text-xs text-gray-400 border-b border-slate-700">
-                                        <th class="pb-3 px-3">Ativo</th>
-                                        <th class="pb-3 px-3">Estratégia</th>
-                                        <th class="pb-3 px-3">Alav.</th>
-                                        <th class="pb-3 px-3">Risco/Trade</th>
-                                        <th class="pb-3 px-3">Stop Loss</th>
-                                        <th class="pb-3 px-3">Take Profit</th>
-                                        <th class="pb-3 px-3">Modo Saída</th>
-                                        <th class="pb-3 px-3">Direção</th>
-                                        <th class="pb-3 px-3">Trailing</th>
+                                        {# MODIFICAÇÃO: Adicionado onclick, data-sort-col e data-sort-type para ordenação #}
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 0, 'text')" data-sort-col="0" data-sort-type="text">Ativo <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 1, 'text')" data-sort-col="1" data-sort-type="text">Estratégia <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 2, 'number')" data-sort-col="2" data-sort-type="number">Alav. <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 3, 'number')" data-sort-col="3" data-sort-type="number">Risco/Trade <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 4, 'text')" data-sort-col="4" data-sort-type="text">Stop Loss <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 5, 'number')" data-sort-col="5" data-sort-type="number">Take Profit <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 6, 'text')" data-sort-col="6" data-sort-type="text">Modo Saída <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 7, 'text')" data-sort-col="7" data-sort-type="text">Direção <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                        <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 8, 'text')" data-sort-col="8" data-sort-type="text">Trailing <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 text-right">Ação</th>
                                     </tr>
                                 </thead>
@@ -603,7 +647,8 @@
                                         <td class="py-3 px-3">
                                             <div class="flex items-center gap-2">
                                                 <span class="w-2 h-2 rounded-full {{ 'bg-green-400' if market.base_currency in account_open_positions else 'bg-gray-400' }}"></span>
-                                                <span class="font-semibold">{{ market.base_currency }}</span>
+                                                {# MODIFICAÇÃO: text-amber-100 para cor dourada #}
+                                                <span class="font-semibold text-amber-100">{{ market.base_currency }}</span>
                                             </div>
                                         </td>
                                         <td class="py-3 px-3 text-sm">{{ market.strategy_name }}</td>
@@ -626,7 +671,26 @@
                                             {% set tsl = market.trailing_stop_config %}
                                             {% if tsl and tsl.type != 'none' %}
                                                 {% if tsl.type == 'breakeven' %}
-                                                    BEP ({{ "%.1f"|format(tsl.breakeven_trigger_rrr) }} RRR)
+                                                    BEP ({{ "%.1f"|format(tsl.breakeven_trigger_rrr | default(0)) }} RRR)
+                                                {% elif tsl.type == 'atr' %}
+                                                    {% set atr_val = tsl.tsl_value | default(tsl.tsl_atr_multiple) | default(0) %}
+                                                    ATR (x{{ "%.2f"|format(atr_val) }})
+                                                {% elif tsl.type == 'fixed_pct' %}
+                                                    FIXED ({{ "%.2f"|format((tsl.tsl_value | default(0)) * 100) }}%)
+                                                {% elif tsl.type == 'high_low_trail' %}
+                                                    HL Trail ({{ "%.2f"|format((tsl.tsl_value | default(0)) * 100) }}% Buffer)
+                                                {% elif tsl.type == 'ema_trail' %}
+                                                    EMA 9
+                                                {% elif tsl.type == 'atr_dynamic' %}
+                                                    ATR Dyn (x{{ "%.2f"|format(tsl.tsl_value | default(0)) }})
+                                                {% elif tsl.type == 'candle_range_confirm' %}
+                                                    Candle Range ({{ "%.2f"|format(tsl.tsl_value | default(0) * 100) }}% Buffer)
+                                                {% elif tsl.type == 'profit_lock' %}
+                                                    {% set params = tsl.tsl_value %}
+                                                    Lock (Max: {{ "%.0f"|format(params.max_lock * 100) }}%)
+                                                {% elif tsl.type == 'ema_trail_delay' %}
+                                                     {% set params = tsl.tsl_value %}
+                                                    Ema Delay (Bars: {{ params.delay_bars }})
                                                 {% else %}
                                                     {{ tsl.type|upper }}
                                                 {% endif %}
@@ -659,19 +723,19 @@
                                 {% for acc in accounts %}<option value="{{ acc.account_name }}">{{ acc.account_name }}</option>{% endfor %}
                             </select>
                         </label>
-                        <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL)." class="block">
+                        <label title="O símbolo do ativo a ser negociado (ex: BTC, ETH, SOL). O par é sempre USD (ex: BTC/USD)." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Ativo</span>
                             <input type="text" name="base_currency" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
-                        <label title="Percentual do capital total da conta a ser arriscado em cada trade." class="block">
+                        <label title="Percentual do capital total da conta a ser arriscado em cada trade. Ex: 1.0 = 1%." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Risco (%)</span>
                             <input type="number" name="risk" value="1.0" step="0.1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
-                        <label title="Fator de multiplicação da sua posição (ex: 10x, 20x)." class="block">
+                        <label title="Fator de multiplicação da sua posição (ex: 10x, 20x). Maior alavancagem aumenta o risco de liquidação." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Alavancagem</span>
                             <input type="number" name="leverage" value="10" step="1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
-                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas." class="block">
+                        <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas. 'BTC Trend' restringe a direção baseada na tendência do Bitcoin." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Direção</span>
                             <select name="direction_mode" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                                 <option value="long_short">Long & Short</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option><option value="btc_trend">BTC Trend</option>
@@ -679,47 +743,101 @@
                         </label>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações." class="block">
+                        <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações. As estratégias são configuradas internamente no código." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Estratégia</span>
                             <select name="strategy_name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                                 {% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
                             </select>
                         </label>
-                        <label title="O valor percentual para o Stop Loss." class="block">
+                        <label title="O valor percentual para o Stop Loss em relação ao preço de entrada. Ex: 2.0 = 2% de risco." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Valor SL (%)</span>
                             <input type="number" name="sl_value" value="2.0" step="0.01" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
-                        <label title="A relação Risco/Retorno para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do stop loss." class="block">
+                        <label title="A relação Risco/Retorno (RRR) para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do Stop Loss." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">TP (RRR)</span>
                             <input type="number" name="rrr" value="2.0" step="0.1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
                     </div>
                     <div class="flex flex-wrap items-end gap-4">
-                         <label title="'Passivo' usa apenas SL/TP. 'Ativo' permite que a estratégia feche a posição se o sinal reverter." class="block">
+                         <label title="'Passivo' usa apenas SL/TP (saída por preço). 'Ativo' permite que a estratégia feche a posição se o sinal de entrada reverter ou outro critério for atingido." class="block">
                              <span class="block text-sm font-medium text-gray-300 mb-2">Modo Saída</span>
                              <select name="exit_mode" onchange="toggleTslSection(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                                 <option value="passivo">Passivo</option><option value="ativo">Ativo</option>
                             </select>
                          </label>
-                        <div id="tsl-section" style="display:none;" class="flex flex-wrap items-end gap-4">
-                            <label title="Um stop loss que se move a favor do preço para proteger os lucros." class="block">
+                        <div id="tsl-section" class="flex flex-wrap items-end gap-4">
+                            <label title="Um stop loss que se move a favor do preço para proteger os lucros. O comportamento exato é definido pelo tipo selecionado." class="block">
                                 <span class="block text-sm font-medium text-gray-300 mb-2">Trailing Stop</span>
                                 <select name="tsl_type" onchange="toggleTslOptions(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
-                                    <option value="none">Nenhum</option><option value="breakeven">Break-Even Point</option><option value="atr">ATR Trailing</option>
+                                    <option value="none">Nenhum</option>
+                                    <option value="breakeven">Break-Even Point</option>
+                                    <option value="atr">ATR Trailing (Multiplicador)</option>
+                                    <option value="fixed_pct">Fixo Percentual (%)</option>
+                                    <option value="high_low_trail">High/Low Trail (Buffer %)</option>
+                                    <option value="ema_trail">EMA 9 Trail (Lucro Mínimo %)</option>
+                                    <option value="atr_dynamic">ATR Dinâmico (Multiplicador Base)</option>
+                                    <option value="candle_range_confirm">Candle Range Confirmado (Buffer %)</option>
+                                    <option value="profit_lock">Profit Lock Dinâmico (Config)</option>
+                                    <option value="ema_trail_delay">EMA Trail com Delay (Config)</option>
                                 </select>
                             </label>
+
+                            <div id="tsl-value-options" style="display:none;" class="block">
+                                <label title="O valor é interpretado de acordo com o Trailing Stop selecionado." id="tsl-value-label">
+                                    <span class="block text-sm font-medium text-gray-300 mb-2" id="tsl-value-span">Valor TSL</span>
+                                    <input type="number" name="tsl_value" value="2.0" step="0.01" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                </label>
+                            </div>
+
+                            <div id="tsl-profit-lock-options" style="display:none;" class="block">
+                                <label title="(Profit Lock) Selecione o conjunto de regras: Buffer mínimo para acionar, Fator de escala e Limite máximo de trava." class="block">
+                                    <span class="block text-sm font-medium text-gray-300 mb-2">Parâmetros Profit Lock</span>
+                                    <select name="tsl_profit_lock_index" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                        {% for params in profit_lock_params %}
+                                            <option value="{{ loop.index0 }}"
+                                                data-min="{{ params.min_buffer }}"
+                                                data-scale="{{ params.scale_factor }}"
+                                                data-max="{{ params.max_lock }}">
+                                                Min: {{ "%.1f"|format(params.min_buffer * 100) }}% &bullet; Scale: {{ "%.1f"|format(params.scale_factor) }} &bullet; Max: {{ "%.0f"|format(params.max_lock * 100) }}%
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div id="tsl-ema-delay-options" style="display:none;" class="block">
+                                <label title="(EMA Delay) Selecione o conjunto de regras: Lucro mínimo para acionar, Número de barras de delay e Buffer de segurança." class="block">
+                                    <span class="block text-sm font-medium text-gray-300 mb-2">Parâmetros EMA Delay</span>
+                                    <select name="tsl_ema_delay_index" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                        {% for params in ema_trail_delay_params %}
+                                            <option value="{{ loop.index0 }}"
+                                                data-min="{{ params.min_profit_pct }}"
+                                                data-delay="{{ params.delay_bars }}"
+                                                data-buffer="{{ params.safety_buffer_pct }}">
+                                                Min: {{ "%.1f"|format(params.min_profit_pct * 100) }}% &bullet; Delay: {{ params.delay_bars }} bars &bullet; Buffer: {{ "%.2f"|format(params.safety_buffer_pct * 100) }}%
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+
                             <div id="tsl-breakeven-options" style="display:none;" class="block">
-                                <label title="(Breakeven) Relação Risco/Retorno que, ao ser atingida, move o Stop Loss para o preço de entrada.">
+                                <label title="(Break-Even) Relação Risco/Retorno (RRR) que, ao ser atingida, move o Stop Loss para o preço de entrada ou ligeiramente acima (para cobrir taxas)." class="block">
                                     <span class="block text-sm font-medium text-gray-300 mb-2">Acionar em (RRR)</span>
                                     <input type="number" name="tsl_breakeven_trigger" value="1.0" step="0.1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                                 </label>
                             </div>
                             <div id="tsl-atr-options" style="display:none;"></div>
-                            <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado." class="flex items-center gap-2 text-sm font-medium text-gray-300 pb-2">
+                            <label title="Se marcado, o Take Profit original é removido quando o Trailing Stop é ativado. Isto permite que a posição continue aberta indefinidamente enquanto o TSL avança." class="flex items-center gap-2 text-sm font-medium text-gray-300 pb-2">
                                 <input type="checkbox" name="remove_tp_on_trail" value="true" class="bg-slate-700 border-slate-600 rounded focus:ring-blue-500">Remover TP
                             </label>
                         </div>
                     </div>
+
+                    <div id="tsl-explanation-section" class="mt-6 p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-sm" style="display: none;">
+                        <div id="tsl-explanation-content"></div>
+                    </div>
+
                      <div class="flex gap-3 justify-end pt-4 border-t border-slate-700">
                         <button type="button" onclick="hideSetupForm()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Cancelar</button>
                         <button type="submit" name="action" value="run_backtest" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">Rodar Backtest</button>
@@ -782,21 +900,25 @@
                         Logs
                     </h2>
                     <div class="log-toolbar-section" id="log-stats-counters">
-                        <span class="stat-badge stat-badge-all" title="Total de logs">
+                        {# MODIFICAÇÃO: Transformado em botões clicáveis para filtrar #}
+                        <button class="stat-badge stat-badge-all log-level-filter-btn active" data-level="ALL" onclick="filterLogsByLevel('ALL')" title="Total de logs">
                             ALL <span id="log-count-all">0</span>
-                        </span>
-                        <span class="stat-badge stat-badge-info" title="Logs de Informação">
+                        </button>
+                        <button class="stat-badge stat-badge-info log-level-filter-btn" data-level="INFO" onclick="filterLogsByLevel('INFO')" title="Logs de Informação">
                             INFO <span id="log-count-info">0</span>
-                        </span>
-                        <span class="stat-badge stat-badge-success" title="Logs de Sucesso">
+                        </button>
+                        <button class="stat-badge stat-badge-success log-level-filter-btn" data-level="SUCCESS" onclick="filterLogsByLevel('SUCCESS')" title="Logs de Sucesso">
                             OK <span id="log-count-success">0</span>
-                        </span>
-                        <span class="stat-badge stat-badge-warning" title="Logs de Aviso">
+                        </button>
+                        <button class="stat-badge stat-badge-warning log-level-filter-btn" data-level="WARNING" onclick="filterLogsByLevel('WARNING')" title="Logs de Aviso">
                             WARN <span id="log-count-warning">0</span>
-                        </span>
-                        <span class="stat-badge stat-badge-error" title="Logs de Erro">
+                        </button>
+                        <button class="stat-badge stat-badge-error log-level-filter-btn" data-level="ERROR" onclick="filterLogsByLevel('ERROR')" title="Logs de Erro">
                             ERR <span id="log-count-error">0</span>
-                        </span>
+                        </button>
+                        <button class="stat-badge stat-badge-execute log-level-filter-btn" data-level="EXECUTE" onclick="filterLogsByLevel('EXECUTE')" title="Logs de Execução">
+                            EXEC <span id="log-count-execute">0</span>
+                        </button>
                     </div>
                 </div>
 
@@ -826,12 +948,14 @@
                     </div>
                     <input type="text" id="log-search-input" placeholder="Buscar nos logs..." class="log-filter-input pl-8">
                 </div>
-                <select id="log-level-filter" class="log-filter-input w-full md:w-auto flex-1">
+                {# Este select é mantido, mas agora é controlado pelos botões #}
+                <select id="log-level-filter" class="log-filter-input w-full md:w-auto flex-1" style="display: none;">
                     <option value="ALL">Nível: TODOS</option>
                     <option value="INFO">Nível: INFO</option>
                     <option value="SUCCESS">Nível: SUCCESS</option>
                     <option value="WARNING">Nível: WARNING</option>
                     <option value="ERROR">Nível: ERROR</option>
+                    <option value="EXECUTE">Nível: EXECUTE</option>
                     <option value="DEBUG">Nível: DEBUG</option>
                 </select>
                 <select id="log-account-filter" class="log-filter-input w-full md:w-auto flex-1">
@@ -923,6 +1047,69 @@
         // --- Funções da Lógica Original da Página (Restauradas e Globais) ---
         const exchangesData = {{ exchanges_data | tojson | safe }};
 
+        // Explicações detalhadas para o TSL (NOVO OBJETO)
+        const tslExplanations = {
+            "none": {
+                "title": "Nenhum TSL Selecionado",
+                "description": "Desativa qualquer forma de Trailing Stop. A posição será encerrada apenas pelo Stop Loss (SL) inicial, pelo Take Profit (TP) ou por um sinal de saída da estratégia. Ideal para testes base e estratégias com saída própria.",
+                "params": "N/A"
+            },
+
+            "breakeven": {
+                "title": "Break-Even Point (BEP)",
+                "description": "Move o Stop Loss (SL) para o preço de entrada (ou ligeiramente acima/abaixo para cobrir taxas) quando o lucro não realizado atinge um múltiplo de risco pré-definido. Isso garante que, após atingir certo lucro, a operação não possa mais gerar prejuízo.",
+                "params": "Acionar em (RRR): Múltiplo do risco (R) para disparar o BEP. Exemplo: Se o SL inicial representa 1% de risco e o RRR = 1.0, o BEP será ativado quando o preço estiver 1% acima do preço de entrada."
+            },
+
+            "atr": {
+                "title": "ATR Trailing (Multiplicador Fixo)",
+                "description": "Usa o indicador ATR (Average True Range) para definir a distância dinâmica do SL. Em mercados voláteis, o ATR aumenta e o SL se afasta; em mercados calmos, o SL se aproxima. Mantém o SL a uma distância proporcional à volatilidade atual.",
+                "params": "Multiplicador ATR: Controla a sensibilidade do TSL. Exemplo: 2.0 → SL = Preço atual - (ATR × 2). Um valor maior dá mais espaço; menor, reage mais rápido."
+            },
+
+            "atr_dynamic": {
+                "title": "ATR Dinâmico (Ajuste Adaptativo)",
+                "description": "Versão inteligente do ATR Trailing. O multiplicador é ajustado automaticamente: diminui em períodos de alta volatilidade e aumenta em períodos calmos. Isso mantém o equilíbrio entre proteção e liberdade de movimento da operação.",
+                "params": "Multiplicador Base: O valor inicial (ex: 2.0). O sistema ajusta entre 0.8x e 1.5x conforme a volatilidade medida pelo ATR."
+            },
+
+            "fixed_pct": {
+                "title": "Trailing Fixo (%)",
+                "description": "Mantém o SL sempre a uma distância percentual fixa do preço atual. Ideal para mercados com volatilidade estável e movimentos previsíveis. O SL sobe (ou desce) conforme o preço se movimenta a favor da operação.",
+                "params": "Percentual Fixo (%): Distância entre o SL e o preço. Exemplo: 0.5 → SL 0.5% abaixo (Long) ou acima (Short) do preço atual."
+            },
+
+            "high_low_trail": {
+                "title": "High/Low Trail (Buffer %)",
+                "description": "Usa os extremos do candle anterior (High e Low) como referência para o SL. Para posições Long, o SL vai para o Low anterior menos um pequeno buffer; para Short, vai para o High anterior mais o buffer. O SL só se move quando o preço avança na direção do lucro, evitando ruídos.",
+                "params": "Buffer (%): Distância adicional ao ponto de High/Low. Exemplo: 0.2 (0.002) → SL (Long) = Low anterior - 0.2%."
+            },
+
+            "ema_trail": {
+                "title": "EMA 9 Trail (Lucro Mínimo %)",
+                "description": "Usa a Média Móvel Exponencial de 9 períodos (EMA 9) como referência dinâmica de tendência. O SL acompanha a EMA 9, mas só começa a mover após atingir um lucro mínimo definido, garantindo que a operação tenha espaço para respirar antes da trava iniciar.",
+                "params": "Lucro Mínimo (%): Percentual de lucro necessário para começar a seguir a EMA 9. Exemplo: 0.01 (1%) → O SL passa a seguir a EMA 9 - 0.2% de buffer após 1% de lucro."
+            },
+
+            "ema_trail_delay": {
+                "title": "EMA Trail com Delay (Config.)",
+                "description": "Combina a lógica da EMA 9 com um atraso controlado (Delay). O SL só começa a seguir a EMA 9 depois que dois critérios forem atendidos: o lucro mínimo atingido e o número mínimo de candles de delay. Ideal para evitar stops prematuros logo após a entrada.",
+                "params": "Parâmetros: (Lucro Mínimo %, Delay Bars, Buffer %). Exemplo: Min: 0.5%, Delay: 2, Buffer: 0.2%."
+            },
+
+            "candle_range_confirm": {
+                "title": "Candle Range Confirmado (Buffer %)",
+                "description": "Aguarda dois candles consecutivos confirmando a direção do movimento antes de mover o SL. Evita ser acionado por ruídos curtos. O SL é ajustado ao Low (para Long) ou High (para Short) do segundo candle confirmado, menos/mais um buffer.",
+                "params": "Buffer (%): Margem de segurança adicionada ao ponto confirmado. Exemplo: 0.2 (0.002) → SL = Low confirmado - 0.2%."
+            },
+
+            "profit_lock": {
+                "title": "Profit Lock Dinâmico (Config.)",
+                "description": "Trava progressivamente parte do lucro. Após atingir o lucro mínimo (Min Buffer), o SL sobe gradualmente com base em um fator de escala (Scale Factor), até atingir um limite máximo (Max Lock). Excelente para operações longas e tendências consistentes.",
+                "params": "Parâmetros: (Min Buffer %, Scale Factor, Max Lock %). Exemplo: Min: 0.5%, Scale: 0.5, Max: 80% → após 0.5% de lucro, 50% do ganho adicional é protegido até 80% do total."
+            }
+        };
+
         function toggleSetups(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
@@ -948,6 +1135,15 @@
             if(form.querySelector('[name="direction_mode"]')) form.querySelector('[name="direction_mode"]').value = "long_short";
             if(form.querySelector('[name="exit_mode"]')) form.querySelector('[name="exit_mode"]').value = "passivo";
             if(form.querySelector('[name="tsl_type"]')) form.querySelector('[name="tsl_type"]').value = "none";
+
+            // NOVO: Reset do campo de valor TSL
+            const tslValueInput = form.querySelector('[name="tsl_value"]');
+            if(tslValueInput) tslValueInput.value = "2.0";
+
+            // NOVO: Reset dos índices de seleção de parâmetros
+            if(form.querySelector('[name="tsl_profit_lock_index"]')) form.querySelector('[name="tsl_profit_lock_index"]').value = "0";
+            if(form.querySelector('[name="tsl_ema_delay_index"]')) form.querySelector('[name="tsl_ema_delay_index"]').value = "0";
+
             toggleTslSection('passivo');
         }
 
@@ -955,24 +1151,104 @@
              const section = document.getElementById('add-setup-form-section'); if (section) section.style.display = 'none'; resetSetupForm();
         }
 
+        // Função utilitária para comparar dicionários de TSL
+        function compareTslDicts(dict1, dict2) {
+             if (typeof dict1 !== 'object' || dict1 === null || typeof dict2 !== 'object' || dict2 === null) return false;
+             const keys1 = Object.keys(dict1).sort();
+             const keys2 = Object.keys(dict2).sort();
+             if (keys1.length !== keys2.length) return false;
+             for (let i = 0; i < keys1.length; i++) {
+                 const key = keys1[i];
+                 if (key !== keys2[i]) return false; // Chaves devem ser iguais
+
+                 // Compara valores, usando tolerância para floats
+                 const val1 = dict1[key];
+                 const val2 = dict2[key];
+
+                 if (typeof val1 === 'number' && typeof val2 === 'number') {
+                     // Compara floats com pequena tolerância para evitar erros de precisão
+                     if (Math.abs(val1 - val2) > 0.0000001) return false;
+                 } else if (val1 !== val2) {
+                     return false;
+                 }
+             }
+             return true;
+        }
+
+
         function showSetupForm(setupData) {
-             const section = document.getElementById('add-setup-form-section'); const form = document.getElementById('setup-form'); if (!section || !form) return; resetSetupForm();
+             const section = document.getElementById('add-setup-form-section');
+             const form = document.getElementById('setup-form');
+             if (!section || !form) return;
+
+             resetSetupForm();
+
+             const profitLockParams = {{ profit_lock_params | tojson | safe }};
+             const emaTrailDelayParams = {{ ema_trail_delay_params | tojson | safe }};
+             const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+
              if (setupData) { // Edit Mode
-                 form.querySelector('[name="account_name"]').value = setupData.account_name; form.querySelector('[name="base_currency"]').value = setupData.base_currency;
-                 form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100; form.querySelector('[name="leverage"]').value = setupData.leverage;
-                 form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short'; form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
+                 form.querySelector('[name="account_name"]').value = setupData.account_name;
+                 form.querySelector('[name="base_currency"]').value = setupData.base_currency;
+                 form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
+                 form.querySelector('[name="leverage"]').value = setupData.leverage;
+                 form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
+                 form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
                  form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
-                 const slValueInput = form.querySelector('[name="sl_value"]'); slValueInput.value = (setupData.stop_loss_config?.type === 'percentage') ? (setupData.stop_loss_config.value * 100) : setupData.stop_loss_config?.value; // Added safe navigation
-                 const exitModeSelect = form.querySelector('[name="exit_mode"]'); exitModeSelect.value = setupData.exit_mode; toggleTslSection(setupData.exit_mode);
-                 const tslConfig = setupData.trailing_stop_config; const tslTypeSelect = form.querySelector('[name="tsl_type"]');
-                 if (tslConfig && tslConfig.type !== 'none') {
-                     if(tslTypeSelect) tslTypeSelect.value = tslConfig.type; // Check if select exists
+
+                 const slValueInput = form.querySelector('[name="sl_value"]');
+                 slValueInput.value = (setupData.stop_loss_config?.type === 'percentage') ? (setupData.stop_loss_config.value * 100) : setupData.stop_loss_config?.value;
+
+                 const exitModeSelect = form.querySelector('[name="exit_mode"]');
+                 exitModeSelect.value = setupData.exit_mode;
+                 toggleTslSection(setupData.exit_mode);
+
+                 const tslConfig = setupData.trailing_stop_config;
+                 const tslValueInput = form.querySelector('[name="tsl_value"]');
+
+                 if (tslConfig && tslConfig.type && tslConfig.type !== 'none') {
+                     if(tslTypeSelect) tslTypeSelect.value = tslConfig.type;
+
+                     // 1. TSL com valor direto (Float)
+                     if (tslValueInput && tslConfig.tsl_value !== undefined && typeof tslConfig.tsl_value === 'number') {
+                         if (tslConfig.type === 'atr' || tslConfig.type === 'atr_dynamic') {
+                              tslValueInput.value = tslConfig.tsl_value; // Valor é o multiplicador (ex: 2.0)
+                         } else {
+                              // Valor é o decimal (ex: 0.005). Multiplica por 100 para o display do usuário.
+                              tslValueInput.value = (tslConfig.tsl_value * 100).toFixed(4);
+                         }
+                     }
+                     // 2. TSL com Parâmetros de Dicionário (profit_lock)
+                     else if (tslConfig.type === 'profit_lock') {
+                          const select = form.querySelector('[name="tsl_profit_lock_index"]');
+                          const tslValueDict = tslConfig.tsl_value;
+                          if (select && tslValueDict) {
+                              // Encontra o índice correspondente no array global
+                              const index = profitLockParams.findIndex(p => compareTslDicts(p, tslValueDict));
+                              if (index !== -1) select.value = index.toString();
+                          }
+                     }
+                     // 3. TSL com Parâmetros de Dicionário (ema_trail_delay)
+                     else if (tslConfig.type === 'ema_trail_delay') {
+                         const select = form.querySelector('[name="tsl_ema_delay_index"]');
+                          const tslValueDict = tslConfig.tsl_value;
+                          if (select && tslValueDict) {
+                              // Encontra o índice correspondente no array global
+                              const index = emaTrailDelayParams.findIndex(p => compareTslDicts(p, tslValueDict));
+                              if (index !== -1) select.value = index.toString();
+                          }
+                     }
+
+                     // Breakeven (mantido)
                      if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) { form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr; }
                      if (form.querySelector('[name="remove_tp_on_trail"]')) { form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false; }
+
                  } else if (tslTypeSelect) { tslTypeSelect.value = 'none'; }
-                 if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value); // Check if select exists
+
+                 if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value);
              } else { // Add Mode
                   {% if accounts %} if (form.querySelector('[name="account_name"]')) { form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}"; } {% endif %}
+                  if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value); // Garante que o estado inicial seja none
              }
              section.style.display = 'block'; section.scrollIntoView({ behavior: 'smooth' });
          }
@@ -984,14 +1260,107 @@
         }
 
         function toggleTslSection(exitMode) {
-             const tslSection = document.getElementById('tsl-section'); if (!tslSection) return;
-             if (exitMode === 'ativo') { tslSection.style.display = 'flex'; }
-             else { tslSection.style.display = 'none'; const tslTypeSelect = document.querySelector('select[name="tsl_type"]'); if (tslTypeSelect) { tslTypeSelect.value = 'none'; toggleTslOptions('none'); } }
+             // TSL Section is now permanently visible (no change to display)
+             // Only enforce TSL cleanup if the mode is 'passivo'
+             if (exitMode === 'passivo') {
+                const tslTypeSelect = document.querySelector('select[name="tsl_type"]');
+                if (tslTypeSelect && tslTypeSelect.value !== 'none') {
+                    tslTypeSelect.value = 'none';
+                    toggleTslOptions('none');
+                }
+             }
         }
 
         function toggleTslOptions(tslType) {
-             const breakevenOptions = document.getElementById('tsl-breakeven-options'); const atrOptions = document.getElementById('tsl-atr-options'); const removeTpCheckboxLabel = document.querySelector('label[title*="Take Profit original"]');
-             if (breakevenOptions) breakevenOptions.style.display = tslType === 'breakeven' ? 'flex' : 'none'; if (atrOptions) atrOptions.style.display = tslType === 'atr' ? 'flex' : 'none'; if (removeTpCheckboxLabel) { removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none'; }
+             const tslValueOptions = document.getElementById('tsl-value-options');
+             const tslValueSpan = document.getElementById('tsl-value-span');
+             const tslValueInput = tslValueOptions ? tslValueOptions.querySelector('input[name="tsl_value"]') : null;
+
+             const breakevenOptions = document.getElementById('tsl-breakeven-options');
+             const profitLockOptions = document.getElementById('tsl-profit-lock-options');
+             const profitLockSelect = profitLockOptions ? profitLockOptions.querySelector('select[name="tsl_profit_lock_index"]') : null;
+             const emaDelayOptions = document.getElementById('tsl-ema-delay-options');
+             const emaDelaySelect = emaDelayOptions ? emaDelayOptions.querySelector('select[name="tsl_ema_delay_index"]') : null;
+
+             // NOVO: Referências para a seção de explicação
+             const explanationSection = document.getElementById('tsl-explanation-section');
+             const explanationContent = document.getElementById('tsl-explanation-content');
+             const explanation = tslExplanations[tslType] || tslExplanations['none'];
+
+
+             // --- 1. Ocultar e Resetar Required ---
+             // Resetar todos os campos relacionados a valor/parâmetros
+             [tslValueOptions, breakevenOptions, profitLockOptions, emaDelayOptions].forEach(el => {
+                 if (el) el.style.display = 'none';
+             });
+
+             // Remover 'required' de todos os campos de valor/seleção
+             if (tslValueInput) tslValueInput.required = false;
+             if (profitLockSelect) profitLockSelect.required = false;
+             if (emaDelaySelect) emaDelaySelect.required = false;
+             if (breakevenOptions) breakevenOptions.querySelector('input[name="tsl_breakeven_trigger"]').required = false;
+
+             // 4. Gerenciar Explicação
+             if (explanationContent) {
+                 explanationContent.innerHTML = `
+                     <p class="font-semibold text-blue-300 mb-2">${explanation.title}</p>
+                     <p class="text-slate-300 mb-1">${explanation.description}</p>
+                     <p class="text-xs text-slate-400 mt-2">
+                         <strong class="text-slate-300">Parâmetros:</strong> ${explanation.params}
+                     </p>
+                 `;
+             }
+
+             if (explanationSection) {
+                 explanationSection.style.display = tslType === 'none' ? 'none' : 'block';
+             }
+
+
+             // --- 2. Gerenciar Opções e Setar Required ---
+             const requiresDirectValue = tslType === 'atr' || tslType === 'fixed_pct' || tslType === 'high_low_trail' || tslType === 'ema_trail' || tslType === 'atr_dynamic' || tslType === 'candle_range_confirm';
+
+             if (requiresDirectValue) {
+                 if (tslValueOptions) tslValueOptions.style.display = 'block';
+                 if (tslValueInput) tslValueInput.required = true;
+
+                 // Atualiza label, step e valor default baseado no TSL Type
+                 if (tslType === 'atr' || tslType === 'atr_dynamic') {
+                     tslValueSpan.textContent = 'Multiplicador ATR';
+                     if (!tslValueInput.value || parseFloat(tslValueInput.value) <= 0.01) tslValueInput.value = '2.0';
+                     tslValueInput.step = '0.1';
+                 } else if (tslType === 'fixed_pct') {
+                     tslValueSpan.textContent = 'TSL Fixo (%)';
+                     if (!tslValueInput.value || parseFloat(tslValueInput.value) >= 1.0) tslValueInput.value = '0.5';
+                     tslValueInput.step = '0.01';
+                 } else if (tslType === 'high_low_trail') {
+                     tslValueSpan.textContent = 'HL Trail Buffer (%)';
+                     if (!tslValueInput.value || parseFloat(tslValueInput.value) >= 1.0) tslValueInput.value = '0.2';
+                     tslValueInput.step = '0.01';
+                 } else if (tslType === 'ema_trail') {
+                     tslValueSpan.textContent = 'EMA 9 Lucro Mínimo (%)';
+                     if (!tslValueInput.value || parseFloat(tslValueInput.value) >= 1.0) tslValueInput.value = '0.1';
+                     tslValueInput.step = '0.01';
+                 } else if (tslType === 'candle_range_confirm') {
+                      tslValueSpan.textContent = 'Candle Range Buffer (%)';
+                     if (!tslValueInput.value || parseFloat(tslValueInput.value) >= 1.0) tslValueInput.value = '0.2';
+                     tslValueInput.step = '0.01';
+                 }
+             } else if (tslType === 'profit_lock') {
+                 if (profitLockOptions) profitLockOptions.style.display = 'block';
+                 if (profitLockSelect) profitLockSelect.required = true; // Set required
+             } else if (tslType === 'ema_trail_delay') {
+                 if (emaDelayOptions) emaDelayOptions.style.display = 'block';
+                 if (emaDelaySelect) emaDelaySelect.required = true; // Set required
+             } else if (tslType === 'breakeven') {
+                 if (breakevenOptions) breakevenOptions.style.display = 'flex';
+                 if (breakevenOptions) breakevenOptions.querySelector('input[name="tsl_breakeven_trigger"]').required = true;
+             }
+
+             // 3. Remover TP on Trail (relevante para todos os TSL ativos)
+             const removeTpCheckboxLabel = document.querySelector('label[title*="Take Profit original"]');
+             if (removeTpCheckboxLabel) {
+                 removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none';
+             }
         }
 
         function togglePositionsTable() {
@@ -1020,10 +1389,111 @@
 
         function editAccount(accountData) {
              const form = document.getElementById('account-form'); if (!form) return; resetAccountForm(); const exchangeSelect = form.querySelector('[name="exchange_name"]'); const title = document.getElementById('account-form-title');
-             if (title) title.innerText = 'Editar Conta: ' + accountData.account_name; form.querySelector('[name="original_account_name"]').value = accountData.account_name; form.querySelector('[name="account_name"]').value = accountData.account_name; if (exchangeSelect) exchangeSelect.value = accountData.exchange_name; form.querySelector('[name="check_interval"]').value = accountData.check_interval_seconds; toggleCredentialFields(accountData.exchange_name);
+             if (title) title.innerText = 'Editar Conta: ' + accountData.account_name; form.querySelector('[name="original_account_name"]').value = accountData.account_name; form.querySelector('[name="account_name"]').value = accountData.account_name; if (exchangeSelect) exchangeSelect.value = accountData.exchange_name; toggleCredentialFields(accountData.exchange_name);
              if (accountData.exchange_name === 'pacifica') { if(form.querySelector('[name="main_public_key"]')) form.querySelector('[name="main_public_key"]').value = accountData.main_public_key || ''; } else if (accountData.exchange_name === 'apex') { if(form.querySelector('[name="api_key"]')) form.querySelector('[name="api_key"]').value = accountData.api_key || ''; }
              toggleCredentialFields(accountData.exchange_name); toggleAddAccountForm(true);
         }
+
+        // --- FUNÇÃO DE ORDENAÇÃO DE TABELA (MANTIDA) ---
+        let sortDirection = {}; // Armazena o estado de ordenação para cada tabela
+
+        function getCellValue(tr, idx, type) {
+            let value = tr.children[idx].textContent.trim();
+            if (type === 'number') {
+                // Remove 'x', '%', ' RRR' e substitui vírgulas por pontos antes de converter para float
+                let cleanValue = value.replace('x', '').replace('%', '').replace(' RRR', '').replace(',', '.').trim();
+                return parseFloat(cleanValue) || 0; // Retorna 0 se falhar a conversão (ex: 'Nenhum')
+            }
+            return value;
+        }
+
+        function sortTable(header, columnIndex, type) {
+            const table = header.closest('table');
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+
+            // Usa o ID do container da tabela para armazenar o estado de ordenação
+            const tableContainer = table.closest('div[id^="setups-content-"]');
+            if (!tableContainer) return; // Garante que estamos numa tabela de setup
+            const tableId = tableContainer.id;
+
+            // Determina a nova direção de ordenação (inverte se a mesma coluna for clicada novamente)
+            let direction = (sortDirection[tableId] && sortDirection[tableId].index === columnIndex && sortDirection[tableId].dir === 'asc') ? 'desc' : 'asc';
+
+            // Coleta todas as linhas do tbody
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Remove a classe de ordenação e a opacidade dos ícones de todos os headers da tabela
+            table.querySelectorAll('th').forEach(th => {
+                const icon = th.querySelector('.sort-icon');
+                if (icon) {
+                    icon.classList.remove('sort-asc', 'sort-desc');
+                    icon.style.opacity = '0.2';
+                }
+            });
+
+            // Adiciona a classe de ordenação ao header clicado
+            const icon = header.querySelector('.sort-icon');
+            if (icon) {
+                icon.classList.add(direction === 'asc' ? 'sort-asc' : 'sort-desc');
+                icon.style.opacity = '1';
+            }
+
+
+            // Armazena o novo estado de ordenação
+            sortDirection[tableId] = { index: columnIndex, dir: direction };
+
+            // Realiza a ordenação
+            const sortedRows = rows.sort((a, b) => {
+                let valA = getCellValue(a, columnIndex, type);
+                let valB = getCellValue(b, columnIndex, type);
+                let comparison = 0;
+
+                // Evita ordenar a linha "Nenhum setup cadastrado"
+                if (a.children.length < 10) return 0;
+
+                if (type === 'number') {
+                    comparison = valA - valB;
+                } else {
+                    comparison = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                }
+
+                return direction === 'asc' ? comparison : comparison * -1;
+            });
+
+            // Reinsere as linhas ordenadas no tbody
+            const fragment = document.createDocumentFragment();
+            sortedRows.forEach(row => fragment.appendChild(row));
+            tbody.innerHTML = '';
+            tbody.appendChild(fragment);
+        }
+        // --- FIM FUNÇÃO DE ORDENAÇÃO DE TABELA ---
+
+
+        // --- FUNÇÃO ADICIONADA: Filtro de Logs por Nível Clicável (GLOBAL) ---
+        function filterLogsByLevel(level) {
+            const levelFilterSelect = document.getElementById('log-level-filter');
+
+            // 1. Atualiza o <select> escondido (para que o listener no DOMContentLoaded reaja)
+            if (levelFilterSelect) {
+                levelFilterSelect.value = level;
+
+                // 2. Aciona o evento 'change' no select para disparar a lógica de filtragem e atualização de botões
+                levelFilterSelect.dispatchEvent(new Event('change'));
+            }
+
+            // 3. (OPCIONAL) Atualiza a aparência dos botões imediatamente para evitar lag visual
+            const buttons = document.querySelectorAll('.log-level-filter-btn');
+            buttons.forEach(btn => {
+                 if (btn.getAttribute('data-level') === level) {
+                     btn.classList.add('active');
+                 } else {
+                     btn.classList.remove('active');
+                 }
+            });
+        }
+        // --- FIM FUNÇÃO ADICIONADA ---
+
 
         // --- Objeto Global para Compartilhamento (Logs <-> Gráfico) ---
         // Definido aqui para ser acessível antes do DOMContentLoaded
@@ -1096,6 +1566,8 @@
             const countSuccess = document.getElementById('log-count-success');
             const countWarning = document.getElementById('log-count-warning');
             const countError = document.getElementById('log-count-error');
+            // NOVO REF
+            const countExecute = document.getElementById('log-count-execute');
             const searchInput = document.getElementById('log-search-input');
             const levelFilter = document.getElementById('log-level-filter');
             const accountFilter = document.getElementById('log-account-filter'); // Filtro de conta dos LOGS
@@ -1193,7 +1665,7 @@
             });
 
              // --- Funções Internas do Painel de Logs (definidas dentro do DOMContentLoaded) ---
-            // (Estas funções podem ficar aqui, pois só são chamadas internamente ou pelos listeners abaixo)
+            // (Estas funções precisam ser definidas aqui dentro para acessar as variáveis de estado: allLogs, filteredLogs, etc.)
             function renderLogs() {
                 const searchTerm = searchInput.value.toLowerCase(); const selectedLevel = levelFilter.value; const selectedAccount = accountFilter.value;
                 filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
@@ -1207,14 +1679,14 @@
                  // Não scrolla aqui, deixa limitDOMLogs cuidar
             }
             function appendLogLine(log) {
-                if (searchInput.value) { renderLogs(); return; } // Re-renderiza se busca ativa
+                if (searchInput.value || levelFilter.value !== 'ALL' || accountFilter.value !== 'ALL') { renderLogs(); return; } // Re-renderiza se busca ou filtro ativo
                 logWindow.style.display = 'block'; noResultsMsg.style.display = 'none';
                 const logElement = createLogLineElement(log); logWindow.appendChild(logElement);
                  // Scroll e limite são chamados por limitDOMLogs
             }
              function limitDOMLogs() {
                 let logsRemoved = 0;
-                while (logWindow.childElementCount > MAX_LOGS_DISPLAY && !searchInput.value) { if(logWindow.firstChild){ logWindow.removeChild(logWindow.firstChild); logsRemoved++; } else { break; } }
+                while (logWindow.childElementCount > MAX_LOGS_DISPLAY && !searchInput.value && levelFilter.value === 'ALL' && accountFilter.value === 'ALL') { if(logWindow.firstChild){ logWindow.removeChild(logWindow.firstChild); logsRemoved++; } else { break; } }
                 updateFooterStats(); // Atualiza contagem exibida
                 if (isAutoScroll) { scrollToBottom(); } // Scroll só se autoscroll ativo
             }
@@ -1234,11 +1706,57 @@
                 line.innerHTML = `${icon}${timestamp}${badge}<span class="log-message">${message}</span>`; return line;
             }
             function getTextNodes(node) { const tN = []; const w = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false); let cN; while(cN = w.nextNode()){ if (cN.parentNode && cN.parentNode.nodeName !== 'SCRIPT' && cN.parentNode.nodeName !== 'STYLE') { tN.push(cN); } } return tN; }
-            function updateCounters() { let i=0, s=0, w=0, e=0; allLogs.forEach(l => { switch(l.level){ case 'INFO': i++; break; case 'SUCCESS': s++; break; case 'WARNING': w++; break; case 'ERROR': e++; break; }}); countAll.textContent = allLogs.length; countInfo.textContent = i; countSuccess.textContent = s; countWarning.textContent = w; countError.textContent = e; }
+
+            function updateCounters() {
+                let i=0, s=0, w=0, e=0, x=0; // Adiciona 'x' para EXECUTE
+                allLogs.forEach(l => {
+                    switch(l.level){
+                        case 'INFO': i++; break;
+                        case 'SUCCESS': s++; break;
+                        case 'WARNING': w++; break;
+                        case 'ERROR': e++; break;
+                        case 'EXECUTE': x++; break; // NOVO NÍVEL
+                    }
+                });
+                countAll.textContent = allLogs.length;
+                countInfo.textContent = i;
+                countSuccess.textContent = s;
+                countWarning.textContent = w;
+                countError.textContent = e;
+                countExecute.textContent = x; // NOVO NÍVEL
+            }
+
             function updateFooterStats(showing = null) { countShowing.textContent = showing ?? logWindow.childElementCount; countTotal.textContent = allLogs.length; }
             function scrollToBottom() { const isAtBottom = logWindow.scrollHeight - logWindow.clientHeight <= logWindow.scrollTop + 15; if (isAutoScroll || isAtBottom) { const last = logWindow.lastElementChild; if(last) last.scrollIntoView({ behavior: 'auto', block: 'end' }); } }
-            function getLevelIcon(l) { let c="log-icon", t=''; switch(l){ case 'INFO': t='<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'; break; case 'SUCCESS': t='<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'; break; case 'WARNING': t='<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'; break; case 'ERROR': t='<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'; break; default: c+=" text-purple-400"; t='<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'; } return `<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>${l}</title>${t}</svg>`; }
-            function getAccountBadge(a) { if (!a) return ''; let bC = window.logPanelGlobals.accountColors[a]; if (!bC){ bC = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length]; window.logPanelGlobals.accountColors[a] = bC; window.logPanelGlobals.colorIndex++; } const bg = hexToRgba(bC, 0.15); const fg = lightenHexColor(bC, 65); return `<span class="log-account-badge" style="background-color:${bg};color:${fg};border-color:${fg};">${escapeHTML(a)}</span>`; }
+            function getLevelIcon(l) {
+                let svgClass = "log-icon";
+                let svgContent = '';
+                 switch (l) {
+                    case 'INFO':
+                        // Círculo externo + Haste vertical (path) + Ponto (circle)
+                        svgContent = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="8" x2="12.01" y2="8"/>';
+                        break;
+                    case 'SUCCESS':
+                        svgContent = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>';
+                        break;
+                    case 'WARNING':
+                        svgContent = '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+                        break;
+                    case 'ERROR':
+                        svgContent = '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>';
+                        break;
+                    case 'EXECUTE': // NOVO NÍVEL
+                        // Ícone de raio (Zap)
+                        svgContent = '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>';
+                        break;
+                    default: // DEBUG e outros
+                         svgClass += " text-purple-400";
+                         svgContent = '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>';
+                 }
+                 // A linha abaixo permanece a mesma
+                 return `<svg class="${svgClass}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>${l}</title>${svgContent}</svg>`;
+            }
+            function getAccountBadge(a) { if (!a) return ''; let bC = window.logPanelGlobals.accountColors[a]; if (!bC){ bC = window.logPanelGlobals.colorPalette[window.logPanelGlobals.colorIndex % window.logPanelGlobals.colorPalette.length]; window.logPanelGlobals.colorIndex++; } const bg = hexToRgba(bC, 0.15); const fg = lightenHexColor(bC, 65); return `<span class="log-account-badge" style="background-color:${bg};color:${fg};border-color:${fg};">${escapeHTML(a)}</span>`; }
             function isLogVisible(l, sT, sL, sA) { if(!l) return false; const lM=sL==='ALL'||l.level===sL; const aM=sA==='ALL'||l.account===sA; const sS=sT||''; const sM=!sS||(l.timestamp&&l.timestamp.includes(sS))||(l.account&&l.account.toLowerCase().includes(sS))||(l.message&&l.message.toLowerCase().includes(sS)); return lM&&aM&&sM; }
             function toggleAutoScroll() { isAutoScroll=!isAutoScroll; autoScrollBtn.classList.toggle('active', isAutoScroll); if(isAutoScroll) scrollToBottom(); }
             function togglePause() { isPaused=!isPaused; pauseBtn.classList.toggle('active', isPaused); if(isPaused){ pauseText.textContent='Retomar'; pauseIcon.style.display='none'; playIcon.style.display='inline-block'; statusText.textContent='Pausados.'; statusIndicator.classList.remove('active'); statusIndicator.classList.add('paused'); } else { pauseText.textContent='Pausar'; pauseIcon.style.display='inline-block'; playIcon.style.display='none'; statusText.textContent='Conectado.'; statusIndicator.classList.add('active'); statusIndicator.classList.remove('paused'); renderLogs(); }}
@@ -1249,7 +1767,25 @@
             // --- Bind de Eventos (Logs) ---
             let searchTimeout;
             if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(renderLogs, 250); });
-            if (levelFilter) levelFilter.addEventListener('change', renderLogs);
+
+            // NOVO BIND: Sincroniza o SELECT (interno) com a renderização E os botões
+            if (levelFilter) {
+                levelFilter.addEventListener('change', () => {
+                    const selectedLevel = levelFilter.value;
+
+                    // Sincroniza a aparência dos botões (pois esta função é chamada ao clicar no botão ou manualmente no select)
+                    document.querySelectorAll('.log-level-filter-btn').forEach(btn => {
+                        if (btn.getAttribute('data-level') === selectedLevel) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+
+                    // RENDERIZAÇÃO DOS LOGS
+                    renderLogs();
+                });
+            }
             if (accountFilter) accountFilter.addEventListener('change', renderLogs); // Filtro de conta dos LOGS
             if (autoScrollBtn) autoScrollBtn.addEventListener('click', toggleAutoScroll);
             if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
@@ -1276,8 +1812,8 @@
                  closeButton.addEventListener('click', closePnlChartModal); // Chama função global
              }
 
-             // Renderiza logs iniciais (após setup dos filtros)
-             renderLogs();
+             // Renderiza logs iniciais (usando a função de filtro para inicializar corretamente a UI)
+             filterLogsByLevel('ALL');
         }); // Fim do DOMContentLoaded principal
 
     </script>

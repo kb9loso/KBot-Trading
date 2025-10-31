@@ -8,7 +8,6 @@ STRATEGIES = {
         "description": "Busca entrar no início de tendências rápidas, filtrado pela EMA 200 para operar a favor da tendência principal.",
         "timeframe": "15m",
         "min_candles": 200, # Aumentado para EMA 200
-        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['EMA_9'] < p['EMA_21'] and c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 55 and c['ADX'] > 20,
         "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['EMA_9'] > p['EMA_21'] and c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 45 and c['ADX'] > 20,
         "exit": lambda c, p, side: (c['EMA_9'] < c['EMA_21'] and c['RSI_9'] < 48) if side == 'long' else (c['EMA_9'] > c['EMA_21'] and c['RSI_9'] > 52)
@@ -17,7 +16,6 @@ STRATEGIES = {
         "description": "Entra em movimentos fortes quando o MACD cruza, filtrado pela EMA 200.",
         "timeframe": "15m",
         "min_candles": 200, # Aumentado para EMA 200
-        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['ADX'] > 20 and c['close'] > c['VWAP'],
         "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['ADX'] > 20 and c['close'] < c['VWAP'],
         "exit": lambda c, p, side: (c['MACD'] < 0) if side == 'long' else (c['MACD'] > 0)
@@ -26,7 +24,6 @@ STRATEGIES = {
         "description": "Estratégia de scalping que busca saídas de condições de sobrevenda/sobrecompra a favor de uma microtendência.",
         "timeframe": "15m",
         "min_candles": 30,
-        "tsl_atr_multiple": 2.0,
         "long_entry": lambda c, p: c['EMA_9'] > c['EMA_21'] and p['STOCH_K'] < 20 and c['STOCH_K'] > p['STOCH_D'] and c['close'] > c['VWAP'],
         "short_entry": lambda c, p: c['EMA_9'] < c['EMA_21'] and p['STOCH_K'] > 80 and c['STOCH_K'] < p['STOCH_D'] and c['close'] < c['VWAP'],
         "exit": lambda c, p, side: (c['STOCH_K'] > 75 and c['STOCH_K'] < c['STOCH_D']) if side == 'long' else (c['STOCH_K'] < 25 and c['STOCH_K'] > c['STOCH_D'])
@@ -35,7 +32,6 @@ STRATEGIES = {
         "description": "Versão robusta: busca rompimentos confirmados (Bollinger + Volume + MACD), mas filtra ruído com ATR e tendência (EMA_50).",
         "timeframe": "15m",
         "min_candles": 150,
-        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: p['close'] > p['BB_upper'] and c['close'] > p['close'] and c['close'] > c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] > c['MACD_signal'] and c['ATR'] < c['ATR_MA'] * 1.3,
         "short_entry": lambda c, p: p['close'] < p['BB_lower'] and c['close'] < p['close'] and c['close'] < c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.5 and c['MACD'] < c['MACD_signal'] and c['ATR'] < c['ATR_MA'] * 1.3,
         "exit": lambda c, p, side: c['BBW'] < c['BBW_min_120'] * 1.2 or c['ATR'] < c['ATR_MA'] * 0.9
@@ -44,7 +40,6 @@ STRATEGIES = {
         "description": "Estratégia de Swing Trade que busca pegar o corpo principal de tendências, agora filtrada pela EMA 200.",
         "timeframe": "1h",
         "min_candles": 200, # Aumentado para EMA 200
-        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: c['close'] > c['EMA_200'] and p['EMA_21'] < p['EMA_50'] and c['EMA_21'] > c['EMA_50'] and c['ADX'] > 25,
         "short_entry": lambda c, p: c['close'] < c['EMA_200'] and p['EMA_21'] > p['EMA_50'] and c['EMA_21'] < c['EMA_50'] and c['ADX'] > 25,
         "exit": lambda c, p, side: (c['EMA_9'] < c['EMA_21']) if side == 'long' else (c['EMA_9'] > c['EMA_21'])
@@ -53,7 +48,6 @@ STRATEGIES = {
         "description": "Busca reversões em extremos de mercado. Não utiliza filtro de tendência para poder operar contra ela.",
         "timeframe": "1h",
         "min_candles": 30,
-        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: p['close'] < p['BB_lower'] and c['close'] > p['BB_lower'] and c['RSI_9'] < 30,
         "short_entry": lambda c, p: p['close'] > p['BB_upper'] and c['close'] < c['BB_upper'] and c['RSI_9'] > 70,
         "exit": lambda c, p, side: (c['close'] > c['BB_middle']) if side == 'long' else (c['close'] < c['BB_middle'])
@@ -62,7 +56,6 @@ STRATEGIES = {
         "description": "Entra em tendências fortes e estabelecidas, aproveitando pullbacks, agora com filtro da EMA 200.",
         "timeframe": "1h",
         "min_candles": 200, # Aumentado para EMA 200
-        "tsl_atr_multiple": 3.0,
         "long_entry": lambda c, p: c['close'] > c['EMA_200'] and c['EMA_9'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and p['low'] <= p['EMA_21'] and c['close'] > c['EMA_21'] and c['ADX'] > 25,
         "short_entry": lambda c, p: c['close'] < c['EMA_200'] and c['EMA_9'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and p['high'] >= p['EMA_21'] and c['close'] < c['EMA_21'] and c['ADX'] > 25,
         "exit": lambda c, p, side: (c['EMA_21'] < c['EMA_50']) if side == 'long' else (c['EMA_21'] > c['EMA_50'])
@@ -71,7 +64,6 @@ STRATEGIES = {
         "description": "Scalping de altíssima frequência. Não utiliza filtro de tendência para maior agilidade.",
         "timeframe": "1m",
         "min_candles": 50,
-        "tsl_atr_multiple": 3.5,
         "long_entry": lambda c, p: (c['close'] > c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.8 and c['RSI_9'] < 58 and c['STOCH_K'] < 80),
         "short_entry": lambda c, p: (c['close'] < c['EMA_9'] and c['volume'] > c['Volume_MA'] * 1.8 and c['RSI_9'] > 42 and c['STOCH_K'] > 20),
         "exit": lambda c, p, side: ((c['close'] < c['EMA_9'] or c['STOCH_K'] > 80) if side == 'long' else (c['close'] > c['EMA_9'] or c['STOCH_K'] < 20))
@@ -80,11 +72,36 @@ STRATEGIES = {
         "description": "Segue tendências com confirmação múltipla, agora com o filtro adicional da EMA 200.",
         "timeframe": "1h",
         "min_candles": 200, # Aumentado para EMA 200
-        "tsl_atr_multiple": 2.5,
         "long_entry": lambda c, p: c['close'] > c['EMA_200'] and (p['MACD'] < p['MACD_signal'] and c['MACD'] > c['MACD_signal'] and c['MACD'] > 0 and c['RSI_14'] > 52 and c['ADX'] > 20),
         "short_entry": lambda c, p: c['close'] < c['EMA_200'] and (p['MACD'] > p['MACD_signal'] and c['MACD'] < c['MACD_signal'] and c['MACD'] < 0 and c['RSI_14'] < 48 and c['ADX'] > 20),
         "exit": lambda c, p, side: ((c['MACD'] < c['MACD_signal'] and c['RSI_14'] < 50) if side == 'long' else (c['MACD'] > c['MACD_signal'] and c['RSI_14'] > 50))
-    }
+    },
+    "10. Momentum Flip (1m)": {
+        "description": "Prevê a direção do próximo candle com base em momentum, volume e reversão leve. Entra e sai no próximo candle. Ativos testados (BTC e XRP). Utilizar somente com taxa 0.",
+        "timeframe": "1m",
+        "min_candles": 50,
+        "long_entry": lambda c, p: c['close'] > c['open'] * 1.0003 and c['close'] > c['EMA_9'] and c['MACD'] > c['MACD_signal'] and c['RSI_9'] > 50,
+        "short_entry": lambda c, p: c['close'] < c['open'] * 0.9997 and c['close'] < c['EMA_9'] and c['MACD'] < c['MACD_signal'] and c['RSI_9'] < 50,
+        "exit": lambda c, p, side: True,
+    },
+
+    "11. Volume Seguro (5m)": {
+        "description": "Foca em trades de qualidade com filtros simples para gerar volume sustentável SL (0.008, 0.01, 0.012) TP (2.0, 2.5, 3.0)",
+        "timeframe": "5m",
+        "min_candles": 100,
+        "long_entry": lambda c, p: c['close'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.2 and c['RSI_9'] > 40 and c['RSI_9'] < 70 and c['MACD'] > c['MACD_signal'] and c['ADX'] > 10,
+        "short_entry": lambda c, p: c['close'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.2 and c['RSI_9'] > 30 and c['RSI_9'] < 60 and c['MACD'] < c['MACD_signal'] and c['ADX'] > 10,
+        "exit": lambda c, p, side: (c['RSI_9'] > 75 or c['close'] < c['EMA_21']) if side == 'long' else (c['RSI_9'] < 25 or c['close'] > c['EMA_21']),
+    },
+
+    "12. Volume Plus (3m)": {
+        "description": "Otimizada para mais trades mantendo rentabilidade - foco em volume sustentável SL (0.008, 0.01, 0.012) TP (2.0, 2.5, 3.0)",
+        "timeframe": "3m",
+        "min_candles": 80,
+        "long_entry": lambda c, p: c['close'] > c['EMA_21'] and c['EMA_21'] > c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.1 and c['RSI_9'] > 35 and c['RSI_9'] < 75 and c['MACD'] > c['MACD_signal'] and c['ADX'] > 8,
+        "short_entry": lambda c, p: c['close'] < c['EMA_21'] and c['EMA_21'] < c['EMA_50'] and c['volume'] > c['Volume_MA'] * 1.1 and c['RSI_9'] > 25 and c['RSI_9'] < 65 and c['MACD'] < c['MACD_signal'] and c['ADX'] > 8,
+        "exit": lambda c, p, side: (c['RSI_9'] > 80 or c['close'] < c['EMA_9']) if side == 'long' else (c['RSI_9'] < 20 or c['close'] > c['EMA_9']),
+    },
 }
 
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:

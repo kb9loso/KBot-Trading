@@ -327,7 +327,18 @@ class ApexClient(BaseExchangeClient):
 
     def cancel_order(self, symbol: str, order_id: str) -> Dict[str, Any]:
         try:
-            return self.client.delete_order_v3(id=str(order_id))
+            api_response = self.client.delete_order_v3(id=str(order_id))
+
+            if api_response and api_response.get('data'):
+                return {"success": True, "data": api_response}
+
+            # Se for um erro da API (que geralmente contém 'msg')
+            if isinstance(api_response, dict) and api_response.get('msg'):
+                return {"success": False, "error": api_response.get('msg')}
+
+            # Fallback para resposta inesperada
+            return {"success": False, "error": "Resposta de cancelamento inválida ou erro desconhecido."}
+
         except Exception as e:
             print(f"Erro no cancel_order da Apex: {e}")
             return {"success": False, "error": str(e)}

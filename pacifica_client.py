@@ -1,4 +1,6 @@
 # KBot-Trading/pacifica_client.py
+from datetime import datetime, timedelta
+
 import requests
 import json
 from typing import Dict, List, Any, Optional
@@ -248,30 +250,25 @@ class PacificaClient(BaseExchangeClient):
 
         return all_open_positions
 
-    def get_trade_history(self, start_time_ms: int, end_time_ms: int, limit: int = 300) -> List[Dict]:
+    def get_trade_history(self, start_time_ms: int, end_time_ms: int, limit: int = 10000) -> List[Dict]:
+        """
+        Busca o histórico de trades, usando um limite fixo de 10000 e sem paginação.
+        """
         path = '/api/v1/positions/history'
-        all_records = []
-        offset = 0
 
-        while True:
-            params = {
-                'account': self.main_public_key,
-                'start_time': start_time_ms,
-                'end_time': end_time_ms,
-                'limit': limit,
-                'offset': offset
-            }
-            response_data = self._make_request('GET', path, params=params)
+        params = {
+            'account': self.main_public_key,
+            'start_time': start_time_ms,
+            'end_time': end_time_ms,
+            'limit': limit,
+        }
 
-            if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
-                records = response_data['data']
-                all_records.extend(records)
-                if len(records) < limit:
-                    break
-                offset += len(records)
-            else:
-                break
-        return all_records
+        response_data = self._make_request('GET', path, params=params)
+
+        if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
+            return response_data['data']
+        else:
+            return []
 
     def get_order_history(self, limit: int = 300) -> List[Dict]:
         path = '/api/v1/orders/history'
