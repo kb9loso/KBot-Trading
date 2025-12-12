@@ -250,45 +250,95 @@ class PacificaClient(BaseExchangeClient):
 
         return all_open_positions
 
-    def get_trade_history(self, start_time_ms: int, end_time_ms: int, limit: int = 10000) -> List[Dict]:
+    def get_trade_history(self, start_time_ms: int, end_time_ms: int, limit: int = 10000, symbol: str = None) -> List[
+        Dict]:
         """
-        Busca o histórico de trades, usando um limite fixo de 10000 e sem paginação.
+        Busca o histórico de trades utilizando paginação por cursor.
         """
-        path = '/api/v1/positions/history'
+        path = '/api/v1/trades/history'
+        all_trades = []
+        cursor = None
 
-        params = {
-            'account': self.main_public_key,
-            'start_time': start_time_ms,
-            'end_time': end_time_ms,
-            'limit': limit,
-        }
+        while len(all_trades) < limit:
+            # Solicita no máximo 100 por vez ou o que falta para atingir o limite total
+            batch_limit = min(100, limit - len(all_trades))
 
-        response_data = self._make_request('GET', path, params=params)
+            params = {
+                'account': self.main_public_key,
+                'start_time': start_time_ms,
+                'end_time': end_time_ms,
+                'limit': batch_limit
+            }
 
-        if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
-            return response_data['data']
-        else:
-            return []
+            # Adiciona o filtro de símbolo se fornecido
+            if symbol:
+                params['symbol'] = symbol
+
+            # Adiciona o cursor para páginas subsequentes
+            if cursor:
+                params['cursor'] = cursor
+
+            response_data = self._make_request('GET', path, params=params)
+
+            if response_data and response_data.get('success'):
+                trades = response_data.get('data', [])
+
+                if isinstance(trades, list):
+                    all_trades.extend(trades)
+
+                # Verifica paginação conforme nova documentação
+                has_more = response_data.get('has_more', False)
+                next_cursor = response_data.get('next_cursor')
+
+                if not has_more or not next_cursor:
+                    break
+
+                cursor = next_cursor
+            else:
+                break
+
+        return all_trades
 
     def get_order_history(self, limit: int = 300) -> List[Dict]:
         path = '/api/v1/orders/history'
         all_orders = []
-        offset = 0
-        while True:
+        cursor = None
+
+        while len(all_orders) < limit:
+            # Define o tamanho do lote da requisição (máximo sugerido 100 ou o restante necessário)
+            batch_limit = min(100, limit - len(all_orders))
+
             params = {
                 'account': self.main_public_key,
-                'limit': limit,
-                'offset': offset
+                'limit': batch_limit
             }
+
+            # Adiciona o cursor apenas se ele existir (não é necessário na primeira chamada)
+            if cursor:
+                params['cursor'] = cursor
+
             response_data = self._make_request('GET', path, params=params)
-            if response_data and response_data.get('success') and isinstance(response_data.get('data'), list):
-                orders = response_data['data']
-                all_orders.extend(orders)
-                if len(orders) < limit:
+
+            if response_data and response_data.get('success'):
+                orders = response_data.get('data', [])
+
+                if isinstance(orders, list):
+                    all_orders.extend(orders)
+
+                # Verifica os campos de paginação da nova documentação
+                has_more = response_data.get('has_more', False)
+                next_cursor = response_data.get('next_cursor')
+
+                # Se não houver mais páginas ou cursor, interrompe o loop
+                if not has_more or not next_cursor:
                     break
-                offset += len(orders)
+
+                # Atualiza o cursor para a próxima iteração
+                cursor = next_cursor
             else:
+                # Em caso de erro na requisição, interrompe para evitar loops infinitos ou dados corrompidos
                 break
+
         return all_orders
 
     def get_market_info(self, symbol: str) -> Dict:

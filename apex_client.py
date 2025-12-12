@@ -388,7 +388,6 @@ class ApexClient(BaseExchangeClient):
             params["slSize"] = amount
             sl_slippage = decimal.Decimal("0.1") if params["slSide"] == "BUY" else decimal.Decimal("-0.1")
             sl_price_with_slippage = decimal.Decimal(stop_loss_price) * (decimal.Decimal("1") + sl_slippage)
-            # --- CORREÇÃO APLICADA AQUI ---
             params["slPrice"] = round_to_increment(float(sl_price_with_slippage), tick_size)
 
             params["isSetOpenTp"] = True
@@ -397,7 +396,6 @@ class ApexClient(BaseExchangeClient):
             params["tpSize"] = amount
             tp_slippage = decimal.Decimal("0.1") if params["tpSide"] == "BUY" else decimal.Decimal("-0.1")
             tp_price_with_slippage = decimal.Decimal(take_profit_price) * (decimal.Decimal("1") + tp_slippage)
-            # --- CORREÇÃO APLICADA AQUI ---
             params["tpPrice"] = round_to_increment(float(tp_price_with_slippage), tick_size)
 
         try:
@@ -497,14 +495,17 @@ class ApexClient(BaseExchangeClient):
         try:
             orderbook = self.get_orderbook(symbol.split('-')[0])
             if side.upper() == "BUY":
-                price_raw = float(orderbook['l'][1][0]['p']) * 1.02  # Preço 5% acima do melhor ask
+                price_raw = float(orderbook['l'][1][0]['p']) * 1.01  # Preço 1% acima do melhor ask
             else:  # SELL
-                price_raw = float(orderbook['l'][0][0]['p']) * 0.98  # Preço 5% abaixo do melhor bid
+                price_raw = float(orderbook['l'][0][0]['p']) * 0.99  # Preço 1% abaixo do melhor bid
 
             price = round_to_increment(price_raw, tick_size)
 
         except Exception:
             price = "0"  # Fallback em caso de erro
+
+        stop_loss_price = kwargs.get('stop_loss_price')
+        take_profit_price = kwargs.get('take_profit_price')
 
         return self.create_order(
             order_type="MARKET",
@@ -513,7 +514,9 @@ class ApexClient(BaseExchangeClient):
             amount=amount,
             price=price,
             reduce_only=reduce_only,
-            tick_size=tick_size
+            tick_size=tick_size,
+            stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price
         )
 
     def update_margin_mode(self, symbol: str, is_isolated: bool) -> Dict[str, Any]:

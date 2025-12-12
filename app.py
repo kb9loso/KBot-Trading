@@ -291,7 +291,7 @@ def full_daily_sync_task():
             try:
                 account_logger.info(f"Sincronização diária completa INICIADA.")
                 client = get_client(exchange_name, account_config)
-                # sync_order_history(client, exchange_name, account_config['account_name'])
+                sync_order_history(client, exchange_name, account_config['account_name'])
                 sync_trade_history(client, exchange_name, account_config['account_name'], daily_start_time_ms)
                 # Força o recálculo do dashboard após a sync completa
                 global dashboard_metrics_timestamp
@@ -1017,6 +1017,24 @@ def process_setup_form():
     if action == 'add_market':
         try:
             config = load_config()
+
+            # --- NOVO CÓDIGO PARA TRATAMENTO DO STOP LOSS BASE ---
+            sl_type_form = request.form.get('sl_type', 'percentage')
+
+            try:
+                raw_sl_value = float(request.form['sl_value'])
+            except ValueError:
+                raise ValueError("Valor do Stop Loss (SL) inválido.")
+
+            # Converte o valor para o formato interno (decimal)
+            # Se for porcentagem, divide por 100 (Input 2.0 -> 0.02)
+            # Se for ATR, o valor é o multiplicador (Input 2.0 -> 2.0)
+            if sl_type_form in ['percentage', 'vwap', 'structure']:
+                final_sl_value = raw_sl_value / 100.0
+            else:
+                final_sl_value = raw_sl_value
+            # ----------------------------------------------------
+
             new_market_setup = {
                 "id": str(int(time.time() * 1000)),
                 "base_currency": base_currency_form,
@@ -1024,31 +1042,55 @@ def process_setup_form():
                 "leverage": int(request.form['leverage']),
                 "strategy_name": request.form['strategy_name'],
                 "risk_per_trade": float(request.form['risk']) / 100.0,
-                "stop_loss_config": {"type": "percentage", "value": float(request.form['sl_value']) / 100.0},
-                # Assumindo % por enquanto
+                "entry_order_type": request.form.get('entry_order_type', 'market'),
+
+                # Configuração de SL atualizada para incluir tipo e valor
+                "stop_loss_config": {"type": sl_type_form, "value": final_sl_value},
+
                 "take_profit_rrr": float(request.form['rrr']),
                 "exit_mode": request.form.get('exit_mode', 'passivo'),
-                "direction_mode": request.form.get('direction_mode', 'long_short')
+                "direction_mode": request.form.get('direction_mode', 'long_short'),
+                "btc_trend_mode": request.form.get('btc_trend_mode', 'ema_7_14')
             }
 
             # Validações de valores
-            if not (0 < new_market_setup['leverage'] <= 100): raise ValueError("Alavancagem inválida.")
-            if not (0 < new_market_setup['risk_per_trade'] <= 0.1): raise ValueError(
-                "Risco por trade inválido (0.01% a 10%).")
-            if not (0 < new_market_setup['stop_loss_config']['value'] <= 0.5): raise ValueError(
-                "Stop loss inválido (0.01% a 50%).")
-            if not (0.1 <= new_market_setup['take_profit_rrr'] <= 20): raise ValueError(
-                "Take Profit RRR inválido (0.1 a 20).")
+            if not (0 < new_market_setup['leverage'] <= 100):
+                raise ValueError("Alavancagem inválida.")
+            if not (0 < new_market_setup['risk_per_trade'] <= 0.1):
+                raise ValueError("Risco por trade inválido (0.01% a 10%).")
 
+            # --- Validação condicional do Stop Loss ---
+            if sl_type_form == 'percentage':
+                if not (0.0001 < final_sl_value <= 0.5):
+                    raise ValueError("Stop loss (%) inválido (0.01% a 50%).")
+            elif sl_type_form == 'atr':
+                if not (0.1 <= final_sl_value <= 10):
+                    raise ValueError("Multiplicador ATR inválido (0.1x a 10x).")
+            elif sl_type_form == 'ema':
+                if not (5 <= final_sl_value <= 200):
+                    raise ValueError("Período da EMA inválido (use entre 5 e 200).")
+            elif sl_type_form == 'vwap':
+                # Validação do Buffer do VWAP (ex: 0.0% a 20%)
+                if not (0.0 <= final_sl_value <= 0.2):
+                    raise ValueError("Buffer VWAP inválido (0% a 20%).")
+            elif sl_type_form == 'structure':
+                # Validação do Buffer do Structure (ex: 0.0% a 5%)
+                if not (0.0 <= final_sl_value <= 0.05):
+                    raise ValueError("Buffer Structure inválido (0% a 5%).")
+            # ------------------------------------------
+
+            if not (0.1 <= new_market_setup['take_profit_rrr'] <= 20):
+                raise ValueError("Take Profit RRR inválido (0.1 a 20).")
+
+            # --- Lógica de Trailing Stop (mantida) ---
             tsl_type = request.form.get('tsl_type')
             if tsl_type and tsl_type != 'none':
                 tsl_config = {"type": tsl_type}
 
-                # --- LÓGICA DE TRATAMENTO DO NOVO VALOR TSL ---
+                # --- LÓGICA DE TRATAMENTO DO NOVO VALOR TSL (Ajustada) ---
                 tsl_value_input = request.form.get('tsl_value')
                 tsl_value_converted = None
 
-                # Variáveis para os novos dicionários - usando .get(..., '') para strings vazias
                 tsl_profit_lock_index_str = request.form.get('tsl_profit_lock_index', '').strip()
                 tsl_ema_delay_index_str = request.form.get('tsl_ema_delay_index', '').strip()
 
@@ -1103,7 +1145,11 @@ def process_setup_form():
                 tsl_config['remove_tp_on_trail'] = request.form.get(
                     'remove_tp_on_trail') == 'true'  # Converte para bool
                 new_market_setup['trailing_stop_config'] = tsl_config
-            # ... (rest of the function)
+            # --- Fim da Lógica de Trailing Stop ---
+
+            # Garante que 'trailing_stop_config' está sempre presente, mesmo como 'none'
+            if tsl_type == 'none' or not tsl_type:
+                new_market_setup['trailing_stop_config'] = {"type": "none"}
 
             account_found = False
             for ex_data in config.get('exchanges', {}).values():
@@ -1192,7 +1238,6 @@ def process_setup_form():
 
         return redirect(url_for('index',
                                 last_backtest_symbol=symbol if 'symbol' in locals() else base_currency_form))  # Garante que o símbolo vá para a URL
-
 
 @app.route('/api/pnl_chart_data')
 def get_pnl_chart_data():

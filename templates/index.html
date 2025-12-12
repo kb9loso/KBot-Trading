@@ -531,10 +531,12 @@
             </div>
 
             <div class="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8">
-                <h2 class="text-xl font-bold flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-5 h-5 text-green-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-                    Performance (Últimos 30 Dias)
-                </h2>
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target w-5 h-5 text-green-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        Performance (Últimos 30 Dias)
+                    </h2>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     {% if dashboard and dashboard.total_trades > 0 %}
                         <div id="pnl-card" class="bg-slate-800 border border-slate-700 rounded-xl p-5 cursor-pointer hover:bg-slate-700/60 transition-colors">
@@ -632,6 +634,7 @@
                                         <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 4, 'text')" data-sort-col="4" data-sort-type="text">Stop Loss <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 5, 'number')" data-sort-col="5" data-sort-type="number">Take Profit <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 6, 'text')" data-sort-col="6" data-sort-type="text">Modo Saída <span class="sort-icon" style="opacity:0.2;"></span></th>
+                                       <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 7, 'text')" data-sort-col="7" data-sort-type="text">Tipo Ordem <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 7, 'text')" data-sort-col="7" data-sort-type="text">Direção <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 cursor-pointer hover:text-white transition" onclick="sortTable(this, 8, 'text')" data-sort-col="8" data-sort-type="text">Trailing <span class="sort-icon" style="opacity:0.2;"></span></th>
                                         <th class="pb-3 px-3 text-right">Ação</th>
@@ -654,7 +657,23 @@
                                         <td class="py-3 px-3 text-sm">{{ market.strategy_name }}</td>
                                         <td class="py-3 px-3 text-sm">{{ market.leverage }}x</td>
                                         <td class="py-3 px-3 text-sm">{{ "%.2f"|format(market.risk_per_trade * 100) }}%</td>
-                                        <td class="py-3 px-3 text-sm">{{ "%.2f"|format(market.stop_loss_config.value * 100) ~ '%' if market.stop_loss_config.type == 'percentage' else market.stop_loss_config.value ~ 'x ATR' }}</td>
+
+                                        {# --- INÍCIO DA ALTERAÇÃO 1: Exibição do SL --- #}
+                                        <td class="py-3 px-3 text-sm">
+                                            {% if market.stop_loss_config.type == 'atr' %}
+                                                ATR (x{{ "%.2f"|format(market.stop_loss_config.value) }})
+                                            {% elif market.stop_loss_config.type == 'ema' %}
+                                                EMA ({{ "%.0f"|format(market.stop_loss_config.value) }})
+                                            {% elif market.stop_loss_config.type == 'vwap' %}
+                                                VWAP ({{ "%.2f"|format(market.stop_loss_config.value * 100) }}%)
+                                            {% elif market.stop_loss_config.type == 'structure' %}
+                                                Struct ({{ "%.2f"|format(market.stop_loss_config.value * 100) }}%)
+                                            {% else %}
+                                                {{ "%.2f"|format(market.stop_loss_config.value * 100) }}%
+                                            {% endif %}
+                                        </td>
+                                        {# --- FIM DA ALTERAÇÃO 1 --- #}
+
                                         <td class="py-3 px-3 text-sm">{{ market.take_profit_rrr }}:1 RRR</td>
                                         <td class="py-3 px-3 text-sm">
                                             <span class="text-xs px-2 py-1 rounded {{ 'bg-green-500/20 text-green-400' if market.exit_mode == 'ativo' else 'bg-gray-500/20 text-gray-400' }}">
@@ -662,10 +681,21 @@
                                             </span>
                                         </td>
                                         <td class="py-3 px-3 text-sm">
-                                            {{ 'Long & Short' if market.direction_mode == 'long_short'
-                                            else 'Long Only' if market.direction_mode == 'long_only'
-                                            else 'Short Only' if market.direction_mode == 'short_only'
-                                            else 'BTC Trend' }}
+                                            <span class="text-xs px-2 py-1 rounded {{ 'bg-blue-500/20 text-blue-400' if market.entry_order_type == 'limit' else 'bg-purple-500/20 text-purple-400' }}">
+                                                {{ (market.entry_order_type | default('market')) | capitalize }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-3 text-sm">
+                                            {% if market.direction_mode == 'btc_trend' %}
+                                                {# Formata 'ema_7_14' para '7/14' #}
+                                                BTC Trend ({{ market.btc_trend_mode | default('ema_7_14') | replace('ema_', '') | replace('_', '/') }})
+                                            {% elif market.direction_mode == 'long_only' %}
+                                                Long Only
+                                            {% elif market.direction_mode == 'short_only' %}
+                                                Short Only
+                                            {% else %}
+                                                Long & Short
+                                            {% endif %}
                                         </td>
                                         <td class="py-3 px-3 text-sm">
                                             {% set tsl = market.trailing_stop_config %}
@@ -716,7 +746,7 @@
             <div class="form-section bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-6 mb-8" id="add-setup-form-section" style="display: none;">
                 <h2 class="text-xl font-bold flex items-center gap-2 mb-6">Adicionar/Atualizar Setup</h2>
                 <form id="setup-form" action="/process_setup_form" method="post" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
                         <label title="Selecione a conta de negociação para associar este setup." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Conta</span>
                             <select name="account_name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
@@ -737,27 +767,64 @@
                         </label>
                         <label title="Define se o bot pode abrir posições compradas (Long), vendidas (Short) ou ambas. 'BTC Trend' restringe a direção baseada na tendência do Bitcoin." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Direção</span>
-                            <select name="direction_mode" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
-                                <option value="long_short">Long & Short</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option><option value="btc_trend">BTC Trend</option>
+                            <select name="direction_mode" onchange="toggleBtcTrendOption(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                <option value="long_short">Long & Short</option>
+                                <option value="long_only">Long Only</option>
+                                <option value="short_only">Short Only</option>
+                                <option value="btc_trend">BTC Trend</option>
+                            </select>
+                        </label>
+                        <div id="btc-trend-ema-container" style="display: none;">
+                            <label title="Escolha qual cruzamento de médias do Bitcoin (Timeframe 1h) definirá a tendência." class="block">
+                                <span class="block text-sm font-medium text-gray-300 mb-2">Médias BTC Trend</span>
+                                <select name="btc_trend_mode" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                    <option value="ema_7_14">EMA 7 e 14 (Padrão)</option>
+                                    <option value="ema_3_8">EMA 3 e 8 (Rápido)</option>
+                                    <option value="ema_8_13">EMA 8 e 13 (Médio)</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label title="Define se a entrada será feita a Mercado (execução imediata, paga spread) ou Limite (tenta pegar melhor preço, pode não executar)." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Tipo de Ordem</span>
+                            <select name="entry_order_type" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                <option value="market">Mercado (Market)</option>
+                                <option value="limit">Limite (Limit)</option>
                             </select>
                         </label>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    {# --- INÍCIO DA ALTERAÇÃO 2: Campos de Stop Loss --- #}
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <label title="A lógica de trading que o bot usará para decidir quando entrar e sair das operações. As estratégias são configuradas internamente no código." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">Estratégia</span>
                             <select name="strategy_name" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                                 {% for name in strategy_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
                             </select>
                         </label>
-                        <label title="O valor percentual para o Stop Loss em relação ao preço de entrada. Ex: 2.0 = 2% de risco." class="block">
-                            <span class="block text-sm font-medium text-gray-300 mb-2">Valor SL (%)</span>
+
+                        <label title="Define como o Stop Loss inicial será calculado. Porcentagem é um risco fixo do preço de entrada; ATR se adapta à volatilidade." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2">Tipo SL</span>
+                            <select name="sl_type" onchange="updateSlInputLabel(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
+                                <option value="percentage">Porcentagem (%)</option>
+                                <option value="atr">ATR (Multiplicador)</option>
+                                <option value="ema">EMA (Período)</option>
+                                <option value="vwap">VWAP (Buffer %)</option>
+                                <option value="structure">Structure (Donchian)</option>
+                            </select>
+                        </label>
+
+                        <label title="O valor para o Stop Loss. Se for %, é a distância em relação ao preço de entrada. Se for ATR, é o múltiplo do ATR (ex: 2.0 = 2x ATR)." class="block">
+                            <span class="block text-sm font-medium text-gray-300 mb-2" id="sl-value-label">Valor SL (%)</span>
                             <input type="number" name="sl_value" value="2.0" step="0.01" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
+
                         <label title="A relação Risco/Retorno (RRR) para o Take Profit. Um valor de 2.0 significa que o alvo de lucro é o dobro da distância do Stop Loss." class="block">
                             <span class="block text-sm font-medium text-gray-300 mb-2">TP (RRR)</span>
                             <input type="number" name="rrr" value="2.0" step="0.1" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500">
                         </label>
                     </div>
+                    {# --- FIM DA ALTERAÇÃO 2 --- #}
+
                     <div class="flex flex-wrap items-end gap-4">
                          <label title="'Passivo' usa apenas SL/TP (saída por preço). 'Ativo' permite que a estratégia feche a posição se o sinal de entrada reverter ou outro critério for atingido." class="block">
                              <span class="block text-sm font-medium text-gray-300 mb-2">Modo Saída</span>
@@ -875,7 +942,7 @@
                                 <tr>
                                     <td class="py-2 px-3 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-down text-red-400"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Short</td>
                                     <td class="py-2 px-3">{{ result['Short Trades'] }}</td>
-                                    <td class="py-2 px-3 font-semibold {{ 'text-green-400' if result['Short Return %'] >= 0 else 'text-red-400' }}">{{ "%+.2f"|format(result['Short Return %']) }}%</td>
+                                    <td class="py-2 px-3 font-semibold {{ 'text-red-400' if result['Short Return %'] < 0 else 'text-green-400' }}">{{ "%+.2f"|format(result['Short Return %']) }}%</td>
                                     <td class="py-2 px-3">{{ "%.1f"|format(result['Short Win Rate %']) }}%</td>
                                 </tr>
                             </tbody>
@@ -1125,14 +1192,33 @@
                  content.style.display = (content.style.display === 'none' || content.style.display === '') ? 'block' : 'none';
             }
         }
+        function toggleBtcTrendOption(mode) {
+            const container = document.getElementById('btc-trend-ema-container');
+            if (container) {
+                container.style.display = (mode === 'btc_trend') ? 'block' : 'none';
+            }
+        }
 
         function resetSetupForm() {
             const form = document.getElementById('setup-form'); if (!form) return; form.reset();
             if(form.querySelector('[name="risk"]')) form.querySelector('[name="risk"]').value = "1.0";
             if(form.querySelector('[name="leverage"]')) form.querySelector('[name="leverage"]').value = "10";
+
+            // --- ALTERAÇÃO 3.1: Reset do SL Type e Valor ---
+            const slTypeSelect = form.querySelector('[name="sl_type"]');
+            if(slTypeSelect) {
+                slTypeSelect.value = "percentage";
+                updateSlInputLabel("percentage"); // Atualiza o rótulo
+            }
             if(form.querySelector('[name="sl_value"]')) form.querySelector('[name="sl_value"]').value = "2.0";
+            // ------------------------------------------------
+
             if(form.querySelector('[name="rrr"]')) form.querySelector('[name="rrr"]').value = "2.0";
-            if(form.querySelector('[name="direction_mode"]')) form.querySelector('[name="direction_mode"]').value = "long_short";
+            if(form.querySelector('[name="direction_mode"]')) {
+                form.querySelector('[name="direction_mode"]').value = "long_short";
+                toggleBtcTrendOption("long_short"); // Reset visual
+            }
+            if(form.querySelector('[name="btc_trend_mode"]')) form.querySelector('[name="btc_trend_mode"]').value = "ema_7_14";
             if(form.querySelector('[name="exit_mode"]')) form.querySelector('[name="exit_mode"]').value = "passivo";
             if(form.querySelector('[name="tsl_type"]')) form.querySelector('[name="tsl_type"]').value = "none";
 
@@ -1177,81 +1263,131 @@
 
 
         function showSetupForm(setupData) {
-             const section = document.getElementById('add-setup-form-section');
-             const form = document.getElementById('setup-form');
-             if (!section || !form) return;
+            const section = document.getElementById('add-setup-form-section');
+            const form = document.getElementById('setup-form');
+            if (!section || !form) return;
 
-             resetSetupForm();
+            resetSetupForm();
 
-             const profitLockParams = {{ profit_lock_params | tojson | safe }};
-             const emaTrailDelayParams = {{ ema_trail_delay_params | tojson | safe }};
-             const tslTypeSelect = form.querySelector('[name="tsl_type"]');
+            const profitLockParams = {{ profit_lock_params | tojson | safe }};
+            const emaTrailDelayParams = {{ ema_trail_delay_params | tojson | safe }};
+            const tslTypeSelect = form.querySelector('[name="tsl_type"]');
 
-             if (setupData) { // Edit Mode
-                 form.querySelector('[name="account_name"]').value = setupData.account_name;
-                 form.querySelector('[name="base_currency"]').value = setupData.base_currency;
-                 form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
-                 form.querySelector('[name="leverage"]').value = setupData.leverage;
-                 form.querySelector('[name="direction_mode"]').value = setupData.direction_mode || 'long_short';
-                 form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
-                 form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
+            if (setupData) { // Edit Mode
+                form.querySelector('[name="account_name"]').value = setupData.account_name;
+                form.querySelector('[name="base_currency"]').value = setupData.base_currency;
+                form.querySelector('[name="risk"]').value = setupData.risk_per_trade * 100;
+                form.querySelector('[name="leverage"]').value = setupData.leverage;
 
-                 const slValueInput = form.querySelector('[name="sl_value"]');
-                 slValueInput.value = (setupData.stop_loss_config?.type === 'percentage') ? (setupData.stop_loss_config.value * 100) : setupData.stop_loss_config?.value;
+                // --- INÍCIO MODIFICAÇÃO BTC TREND ---
+                const dirMode = setupData.direction_mode || 'long_short';
+                form.querySelector('[name="direction_mode"]').value = dirMode;
+                toggleBtcTrendOption(dirMode); // Atualiza visibilidade do campo BTC Trend
 
-                 const exitModeSelect = form.querySelector('[name="exit_mode"]');
-                 exitModeSelect.value = setupData.exit_mode;
-                 toggleTslSection(setupData.exit_mode);
+                // Carrega o modo BTC Trend se existir o campo
+                if (form.querySelector('[name="btc_trend_mode"]')) {
+                    form.querySelector('[name="btc_trend_mode"]').value = setupData.btc_trend_mode || 'ema_7_14';
+                }
+                // --- FIM MODIFICAÇÃO BTC TREND ---
 
-                 const tslConfig = setupData.trailing_stop_config;
-                 const tslValueInput = form.querySelector('[name="tsl_value"]');
+                const orderTypeSelect = form.querySelector('[name="entry_order_type"]');
+                if (orderTypeSelect) {
+                    orderTypeSelect.value = setupData.entry_order_type || 'market';
+                }
+                form.querySelector('[name="strategy_name"]').value = setupData.strategy_name;
+                form.querySelector('[name="rrr"]').value = setupData.take_profit_rrr;
 
-                 if (tslConfig && tslConfig.type && tslConfig.type !== 'none') {
-                     if(tslTypeSelect) tslTypeSelect.value = tslConfig.type;
+                // --- Lógica de Carga do SL ---
+                const slTypeSelect = form.querySelector('[name="sl_type"]');
+                const slValueInput = form.querySelector('[name="sl_value"]');
 
-                     // 1. TSL com valor direto (Float)
-                     if (tslValueInput && tslConfig.tsl_value !== undefined && typeof tslConfig.tsl_value === 'number') {
-                         if (tslConfig.type === 'atr' || tslConfig.type === 'atr_dynamic') {
-                              tslValueInput.value = tslConfig.tsl_value; // Valor é o multiplicador (ex: 2.0)
-                         } else {
-                              // Valor é o decimal (ex: 0.005). Multiplica por 100 para o display do usuário.
-                              tslValueInput.value = (tslConfig.tsl_value * 100).toFixed(4);
-                         }
-                     }
-                     // 2. TSL com Parâmetros de Dicionário (profit_lock)
-                     else if (tslConfig.type === 'profit_lock') {
-                          const select = form.querySelector('[name="tsl_profit_lock_index"]');
-                          const tslValueDict = tslConfig.tsl_value;
-                          if (select && tslValueDict) {
-                              // Encontra o índice correspondente no array global
-                              const index = profitLockParams.findIndex(p => compareTslDicts(p, tslValueDict));
-                              if (index !== -1) select.value = index.toString();
-                          }
-                     }
-                     // 3. TSL com Parâmetros de Dicionário (ema_trail_delay)
-                     else if (tslConfig.type === 'ema_trail_delay') {
-                         const select = form.querySelector('[name="tsl_ema_delay_index"]');
-                          const tslValueDict = tslConfig.tsl_value;
-                          if (select && tslValueDict) {
-                              // Encontra o índice correspondente no array global
-                              const index = emaTrailDelayParams.findIndex(p => compareTslDicts(p, tslValueDict));
-                              if (index !== -1) select.value = index.toString();
-                          }
-                     }
+                const currentSlType = setupData.stop_loss_config?.type || 'percentage';
+                const currentSlValue = setupData.stop_loss_config?.value || 0.02;
 
-                     // Breakeven (mantido)
-                     if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) { form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr; }
-                     if (form.querySelector('[name="remove_tp_on_trail"]')) { form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false; }
+                if (slTypeSelect) {
+                    slTypeSelect.value = currentSlType;
+                    updateSlInputLabel(currentSlType); // Atualiza o rótulo
+                }
 
-                 } else if (tslTypeSelect) { tslTypeSelect.value = 'none'; }
+                if (slValueInput) {
+                    if (currentSlType === 'percentage' || currentSlType === 'structure' || currentSlType === 'vwap') {
+                        // Se for %, multiplica por 100 para o display (0.02 -> 2.0)
+                        slValueInput.value = (currentSlValue * 100).toFixed(2);
+                    } else {
+                        // Se for ATR, usa o valor direto (multiplicador)
+                        slValueInput.value = currentSlValue;
+                    }
+                }
 
-                 if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value);
-             } else { // Add Mode
-                  {% if accounts %} if (form.querySelector('[name="account_name"]')) { form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}"; } {% endif %}
-                  if(tslTypeSelect) toggleTslOptions(tslTypeSelect.value); // Garante que o estado inicial seja none
-             }
-             section.style.display = 'block'; section.scrollIntoView({ behavior: 'smooth' });
-         }
+                const exitModeSelect = form.querySelector('[name="exit_mode"]');
+                exitModeSelect.value = setupData.exit_mode;
+                toggleTslSection(setupData.exit_mode);
+
+                const tslConfig = setupData.trailing_stop_config;
+                const tslValueInputTsl = form.querySelector('[name="tsl_value"]');
+
+                if (tslConfig && tslConfig.type && tslConfig.type !== 'none') {
+                    if (tslTypeSelect) tslTypeSelect.value = tslConfig.type;
+
+                    // 1. TSL com valor direto (Float)
+                    if (tslValueInputTsl && tslConfig.tsl_value !== undefined && typeof tslConfig.tsl_value === 'number') {
+                        if (tslConfig.type === 'atr' || tslConfig.type === 'atr_dynamic') {
+                            tslValueInputTsl.value = tslConfig.tsl_value; // Valor é o multiplicador (ex: 2.0)
+                        } else {
+                            // Valor é o decimal (ex: 0.005). Multiplica por 100 para o display do usuário.
+                            tslValueInputTsl.value = (tslConfig.tsl_value * 100).toFixed(4);
+                        }
+                    }
+                    // 2. TSL com Parâmetros de Dicionário (profit_lock)
+                    else if (tslConfig.type === 'profit_lock') {
+                        const select = form.querySelector('[name="tsl_profit_lock_index"]');
+                        const tslValueDict = tslConfig.tsl_value;
+                        if (select && tslValueDict) {
+                            const index = profitLockParams.findIndex(p => compareTslDicts(p, tslValueDict));
+                            if (index !== -1) select.value = index.toString();
+                        }
+                    }
+                    // 3. TSL com Parâmetros de Dicionário (ema_trail_delay)
+                    else if (tslConfig.type === 'ema_trail_delay') {
+                        const select = form.querySelector('[name="tsl_ema_delay_index"]');
+                        const tslValueDict = tslConfig.tsl_value;
+                        if (select && tslValueDict) {
+                            const index = emaTrailDelayParams.findIndex(p => compareTslDicts(p, tslValueDict));
+                            if (index !== -1) select.value = index.toString();
+                        }
+                    }
+
+                    // Breakeven
+                    if (tslConfig.type === 'breakeven' && form.querySelector('[name="tsl_breakeven_trigger"]')) {
+                        form.querySelector('[name="tsl_breakeven_trigger"]').value = tslConfig.breakeven_trigger_rrr;
+                    }
+                    if (form.querySelector('[name="remove_tp_on_trail"]')) {
+                        form.querySelector('[name="remove_tp_on_trail"]').checked = tslConfig.remove_tp_on_trail || false;
+                    }
+
+                } else if (tslTypeSelect) {
+                    tslTypeSelect.value = 'none';
+                }
+
+                if (tslTypeSelect) toggleTslOptions(tslTypeSelect.value);
+            } else { // Add Mode
+                {% if accounts %}
+                if (form.querySelector('[name="account_name"]')) {
+                    form.querySelector('[name="account_name"]').value = "{{ accounts[0].account_name }}";
+                }
+                {% endif %}
+                // Garante o estado inicial para os novos campos
+                if (form.querySelector('[name="sl_type"]')) updateSlInputLabel("percentage");
+                if (tslTypeSelect) toggleTslOptions(tslTypeSelect.value);
+
+                // Reset visual do BTC Trend no modo Add
+                if (form.querySelector('[name="direction_mode"]')) {
+                     toggleBtcTrendOption(form.querySelector('[name="direction_mode"]').value);
+                }
+            }
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
 
         function validateAccountForm() {
              const form = document.getElementById('account-form'); if (!form) return false; const exchangeName = form.querySelector('[name="exchange_name"]').value; const originalAccountName = form.querySelector('[name="original_account_name"]').value;
@@ -1362,6 +1498,39 @@
                  removeTpCheckboxLabel.style.display = (tslType !== 'none') ? 'flex' : 'none';
              }
         }
+
+        // --- INÍCIO DA ALTERAÇÃO 3.3: Nova Função para o SL Type ---
+        function updateSlInputLabel(type) {
+            const label = document.getElementById('sl-value-label');
+            const input = document.querySelector('input[name="sl_value"]');
+
+            if (label) {
+                if (type === 'atr') {
+                    label.textContent = 'Multiplicador ATR (x)';
+                    if (input) input.step = '0.1';
+                    if (input && parseFloat(input.value) < 0.1) input.value = "2.0";
+                } else if (type === 'ema') {
+                    label.textContent = 'Período da EMA';
+                    if (input) input.step = '1';
+                    if (input && parseFloat(input.value) < 5) input.value = "50";
+                } else if (type === 'vwap') {
+                    label.textContent = 'Buffer VWAP (%)';
+                    if (input) input.step = '0.01';
+                    // Buffer padrão sugerido 1.0 (que será convertido para 0.01 ou 1% no backend)
+                    if (input) input.value = "1.0";
+                } else if (type === 'structure') {
+                    label.textContent = 'Buffer Structure (%)';
+                    if (input) input.step = '0.01';
+                    // Valor padrão sugerido 0.1% (no backtest estava 0.001)
+                    if (input) input.value = "0.1";
+                } else {
+                    label.textContent = 'Valor SL (%)';
+                    if (input) input.step = '0.01';
+                    if (input && parseFloat(input.value) > 1.0) input.value = "2.0";
+                }
+            }
+        }
+        // --- FIM DA ALTERAÇÃO 3.3 ---
 
         function togglePositionsTable() {
              const section = document.getElementById('positions-section'); const icon = document.getElementById('positions-toggle-icon'); if (!section || !icon) return; const isOpen = section.style.display === 'block';
@@ -1666,7 +1835,7 @@
 
              // --- Funções Internas do Painel de Logs (definidas dentro do DOMContentLoaded) ---
             // (Estas funções precisam ser definidas aqui dentro para acessar as variáveis de estado: allLogs, filteredLogs, etc.)
-            function renderLogs() {
+            function renderLogs(forceScroll = false) {
                 const searchTerm = searchInput.value.toLowerCase(); const selectedLevel = levelFilter.value; const selectedAccount = accountFilter.value;
                 filteredLogs = allLogs.filter(log => isLogVisible(log, searchTerm, selectedLevel, selectedAccount));
                 const logsToDisplay = filteredLogs.slice(-MAX_LOGS_DISPLAY); logWindow.innerHTML = '';
@@ -1676,7 +1845,11 @@
                 } else if (allLogs.length > 0) { logWindow.style.display = 'none'; noResultsMsg.style.display = 'block'; }
                 else { logWindow.style.display = 'block'; noResultsMsg.style.display = 'none'; }
                 updateCounters(); updateFooterStats(logsToDisplay.length);
-                 // Não scrolla aqui, deixa limitDOMLogs cuidar
+
+                // CORREÇÃO: Rolar para o final se for uma interação do usuário (forceScroll) ou se Auto-Scroll estiver ativo
+                if (forceScroll || isAutoScroll) {
+                    logWindow.scrollTop = logWindow.scrollHeight;
+                }
             }
             function appendLogLine(log) {
                 if (searchInput.value || levelFilter.value !== 'ALL' || accountFilter.value !== 'ALL') { renderLogs(); return; } // Re-renderiza se busca ou filtro ativo
@@ -1766,7 +1939,8 @@
 
             // --- Bind de Eventos (Logs) ---
             let searchTimeout;
-            if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(renderLogs, 250); });
+            // Busca: Força scroll ao digitar
+            if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => renderLogs(true), 250); });
 
             // NOVO BIND: Sincroniza o SELECT (interno) com a renderização E os botões
             if (levelFilter) {
@@ -1782,11 +1956,12 @@
                         }
                     });
 
-                    // RENDERIZAÇÃO DOS LOGS
-                    renderLogs();
+                    // RENDERIZAÇÃO DOS LOGS (Força Scroll)
+                    renderLogs(true);
                 });
             }
-            if (accountFilter) accountFilter.addEventListener('change', renderLogs); // Filtro de conta dos LOGS
+            // Filtro de Conta: Força Scroll
+            if (accountFilter) accountFilter.addEventListener('change', () => renderLogs(true));
             if (autoScrollBtn) autoScrollBtn.addEventListener('click', toggleAutoScroll);
             if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
             if (copyBtn) copyBtn.addEventListener('click', copyLogs);
@@ -1795,7 +1970,25 @@
 
              // --- Inicialização Geral da Página (Original + Gráfico) ---
             const accountFormExchangeSelect = document.querySelector('#account-form select[name="exchange_name"]'); if (accountFormExchangeSelect) { toggleCredentialFields(accountFormExchangeSelect.value); }
-            const setupFormExitSelect = document.querySelector('#setup-form select[name="exit_mode"]'); if(setupFormExitSelect) { toggleTslSection(setupFormExitSelect.value); const tslTypeSelect = document.querySelector('#setup-form select[name="tsl_type"]'); if(tslTypeSelect) { toggleTslOptions(tslTypeSelect.value); } }
+
+            // --- Ajuste para inicialização do SL Type e TSL ---
+            const setupFormExitSelect = document.querySelector('#setup-form select[name="exit_mode"]');
+            const slTypeSelect = document.querySelector('#setup-form select[name="sl_type"]');
+
+            if (setupFormExitSelect) {
+                toggleTslSection(setupFormExitSelect.value);
+                const tslTypeSelect = document.querySelector('#setup-form select[name="tsl_type"]');
+                if(tslTypeSelect) {
+                    toggleTslOptions(tslTypeSelect.value);
+                }
+            }
+
+            // Inicializa o rótulo do SL (após o reset inicial, se for o caso)
+            if (slTypeSelect) {
+                 updateSlInputLabel(slTypeSelect.value);
+            }
+            // --- Fim do Ajuste ---
+
             const positionsSection = document.getElementById('positions-section'); if (positionsSection) positionsSection.style.display = 'none';
             const setupFormSection = document.getElementById('add-setup-form-section'); if (setupFormSection) setupFormSection.style.display = 'none';
             document.querySelectorAll('[id^="setups-content-"]').forEach(el => el.style.display = 'none'); document.querySelectorAll('[id^="setups-icon-"]').forEach(el => el.style.transform = 'rotate(180deg)');
